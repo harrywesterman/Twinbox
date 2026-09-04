@@ -25,3 +25,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --manifest "$databases_manifest_path" \
   --application "databases"
+
+cluster_id="$(jq -r '.cluster.id // empty' <<<"$STEP_CONTEXT_JSON")"
+[[ -n "$cluster_id" ]] || { echo "Missing cluster id" >&2; exit 1; }
+TWINBOX_CLUSTER_ID="$cluster_id" \
+  bash "$WORKSPACE_ROOT/scripts/manager/render-database-backup-stores.sh"

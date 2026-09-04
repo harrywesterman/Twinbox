@@ -8,7 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_longhorn_uses_seaweedfs_backup_target_and_recurring_jobs():
+def test_longhorn_uses_cluster_backup_profile_and_recurring_jobs():
     app_text = (REPO_ROOT / "gitops" / "apps" / "longhorn.yaml").read_text(encoding="utf-8")
     values_text = (REPO_ROOT / "gitops" / "values" / "longhorn.yaml").read_text(encoding="utf-8")
     script_text = (REPO_ROOT / "scripts" / "manager" / "install-longhorn-storage.sh").read_text(
@@ -21,8 +21,9 @@ def test_longhorn_uses_seaweedfs_backup_target_and_recurring_jobs():
     assert "defaultBackupStore:" in values_text
     assert "backupTarget: __LONGHORN_BACKUP_TARGET__" in values_text
     assert "backupTargetCredentialSecret: __LONGHORN_BACKUP_SECRET_NAME__" in values_text
-    assert '--from-literal=AWS_ENDPOINTS="$SEAWEEDFS_ENDPOINT"' in script_text
-    assert 'LONGHORN_BACKUP_TARGET="s3://${SEAWEEDFS_BUCKET}@${SEAWEEDFS_REGION}/"' in script_text
+    assert '--from-literal=AWS_ENDPOINTS="$BACKUP_S3_ENDPOINT"' in script_text
+    assert "load_backup_storage_profile longhorn" in script_text
+    assert 'LONGHORN_BACKUP_TARGET="s3://${BACKUP_S3_BUCKET}@${BACKUP_S3_REGION}/"' in script_text
     assert "kind: RecurringJob" in script_text
     assert "name: twinbox-snapshot-4h" in script_text
     assert 'cron: "0 */4 * * *"' in script_text
@@ -54,26 +55,32 @@ def test_velero_has_daily_cluster_backup_schedule_with_30_day_ttl():
     assert "storageLocation: default" in values_text
 
 
-def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
+def test_cloudnativepg_clusters_use_rendered_cluster_s3_profile_and_14_day_retention():
     database_root = REPO_ROOT / "gitops" / "databases"
     shared_kustomization_text = (database_root / "shared" / "kustomization.yaml").read_text(
-        encoding="utf-8"
-    )
-    backup_secret_text = (database_root / "shared" / "seaweedfs-backup-credentials.yaml").read_text(
         encoding="utf-8"
     )
     cluster_files = [
         path for path in database_root.glob("*/cluster.yaml") if path.parent.name != "_template"
     ]
     assert cluster_files
-    assert "seaweedfs-backup-credentials.yaml" in shared_kustomization_text
-    assert "name: seaweedfs-backup-credentials" in backup_secret_text
-    assert "twinbox/global/velero" in backup_secret_text
+    assert "seaweedfs-backup-credentials.yaml" not in shared_kustomization_text
+    renderer_text = (REPO_ROOT / "scripts/manager/render-database-backup-stores.sh").read_text()
+    install_text = (
+        REPO_ROOT / "categories/talos-cluster/steps/install-cloudnativepg/run.sh"
+    ).read_text()
+    assert "load_backup_storage_profile databases" in renderer_text
+    assert "twinbox/cluster/${cluster_id}/backup-storage" in renderer_text
+    assert "render-database-backup-stores.sh" in install_text
 
     for path in cluster_files:
         text = path.read_text(encoding="utf-8")
         cluster_name = path.parent.name
         objectstore_text = (path.parent / "objectstore.yaml").read_text(encoding="utf-8")
+        kustomization = path.parent / "kustomization.yaml"
+        kustomization_text = (
+            kustomization.read_text(encoding="utf-8") if kustomization.exists() else ""
+        )
 
         assert "barmanObjectStore:" not in text, path
         assert "plugins:" in text, path
@@ -85,12 +92,11 @@ def test_cloudnativepg_clusters_use_seaweedfs_and_14_day_retention():
         assert "apiVersion: barmancloud.cnpg.io/v1" in objectstore_text, path
         assert "kind: ObjectStore" in objectstore_text, path
         assert 'retentionPolicy: "14d"' in objectstore_text, path
-        assert "destinationPath: s3://twinbox-velero/" in objectstore_text, path
-        assert (
-            "endpointURL: http://seaweedfs.longhorn-system.svc.cluster.local:8333"
-            in objectstore_text
-        ), path
+        assert "destinationPath:" in objectstore_text, path
+        assert "endpointURL:" in objectstore_text, path
         assert "name: seaweedfs-backup-credentials" in objectstore_text, path
+        if kustomization.exists():
+            assert "objectstore.yaml" not in kustomization_text, path
 
     schedule_re = re.compile(r'^\s*schedule: "0 0 2 \* \* ([1-6])"$', re.MULTILINE)
     days_used = set()
@@ -122,7 +128,7 @@ def test_management_vm_backup_installs_host_cron_without_embedding_secrets():
         / "step.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "management-backup.json" in script_text
+    assert "management-backup/metadata.json" in script_text
     assert "restic_password" in script_text
     assert "talosctl etcd snapshot" in script_text
     assert '--talosconfig "$talosconfig"' in script_text
@@ -130,10 +136,9 @@ def test_management_vm_backup_installs_host_cron_without_embedding_secrets():
     assert "management-vm/%s" in script_text
     assert "restic_repo etcd" in script_text
     assert "restic_repo opt-twinbox" in script_text
-    assert '--exclude "${host_root}/seaweedfs/data"' in script_text
+    assert '--exclude "${host_root}/seaweedfs/data"' not in script_text
     assert "--keep-daily=${retention_days}" in script_text
-    assert "17 2 * * * root ${RUNTIME_SCRIPT} etcd" in script_text
-    assert "47 2 * * * root ${RUNTIME_SCRIPT} opt-twinbox" in script_text
+    assert "TWINBOX_MANAGEMENT_BACKUP_CONFIG=${MANAGEMENT_BACKUP_FILE}" in script_text
     assert '--arg password "$password"' in script_text
     cron_template = script_text.split('install -m 0644 /dev/stdin "$CRON_FILE" <<EOF', 1)[1]
     cron_template = cron_template.split("EOF", 1)[0]
@@ -145,20 +150,14 @@ def test_management_vm_backup_installs_host_cron_without_embedding_secrets():
     assert "attachment: talosconfig" in step_text
 
 
-def test_velero_backup_uses_portable_management_ip_resolution():
+def test_velero_backup_uses_cluster_backup_profile_without_management_ip_fallback():
     script_text = (REPO_ROOT / "scripts" / "manager" / "install-velero-backup.sh").read_text(
         encoding="utf-8"
     )
-    helper_text = (REPO_ROOT / "scripts" / "manager" / "management-ip.sh").read_text(
-        encoding="utf-8"
-    )
-
-    assert "management-ip.sh" in script_text
+    assert "backup-storage-profile.sh" in script_text
+    assert "load_backup_storage_profile velero" in script_text
     assert "hostname -I" not in script_text
-    assert "resolve_management_vm_ip()" in helper_text
-    assert "hostname -I" not in helper_text
-    assert "python3 - <<'PY'" in helper_text
-    assert "ip route get 1.1.1.1" in helper_text
+    assert "management-ip.sh" not in script_text
 
 
 def test_management_tools_install_restic_for_host_backup_jobs():
@@ -208,14 +207,17 @@ def test_management_vm_backup_install_uses_cluster_state_before_step_context():
             json.dumps(cluster_state, indent=2) + "\n",
             encoding="utf-8",
         )
-        (secrets_dir / "velero.json").write_text(
+        backup_profile_dir = bootstrap_root / "secrets/cluster/cluster-test/backup-storage"
+        backup_profile_dir.mkdir(parents=True, exist_ok=True)
+        (backup_profile_dir / "metadata.json").write_text(
             json.dumps(
                 {
-                    "endpoint": "http://seaweedfs.longhorn-system.svc.cluster.local:8333",
-                    "bucket": "twinbox-velero",
-                    "region": "seaweedfs",
-                    "username": "velero",
-                    "password": "super-secret",
+                    "mode": "external-s3",
+                    "endpoint": "https://s3.example.com",
+                    "region": "eu-west-1",
+                    "access_key_id": "backup-user",
+                    "secret_access_key": "super-secret",
+                    "buckets": {"management": "cluster-test-management"},
                 },
                 indent=2,
             )
@@ -272,7 +274,9 @@ exit 0
 
         assert result.returncode == 0, result.stderr
 
-        config_file = bootstrap_root / "secrets" / "global" / "management-backup.json"
+        config_file = (
+            bootstrap_root / "secrets/cluster/cluster-test/management-backup/metadata.json"
+        )
         cron_file = host_cron_dir / "twinbox-management-backup"
         runtime_script = bootstrap_root / "bin" / "twinbox-management-backup.sh"
 
@@ -286,22 +290,24 @@ exit 0
 
         assert config["cluster_id"] == "cluster-test"
         assert config["controlplane_ip"] == "192.168.1.11"
-        assert config["endpoint"] == "http://192.168.1.20:8333"
+        assert config["endpoint"] == "https://s3.example.com"
+        assert config["bucket"] == "cluster-test-management"
         assert config["talosconfig"] == str(cluster_secrets_dir / "talosconfig")
         assert config["host_root"] == str(host_repo_root)
         assert config["retention_days"] == 30
-        assert config["exclude_paths"] == [str(host_repo_root / "seaweedfs" / "data")]
+        assert config["exclude_paths"] == []
 
         assert "17 2 * * * root ${RUNTIME_SCRIPT} etcd" not in cron_text
         assert (
-            f"17 2 * * * root {bootstrap_root}/bin/twinbox-management-backup.sh etcd" in cron_text
+            f"TWINBOX_MANAGEMENT_BACKUP_CONFIG={config_file} {bootstrap_root}/bin/twinbox-management-backup.sh etcd"
+            in cron_text
         )
         assert (
-            f"47 2 * * * root {bootstrap_root}/bin/twinbox-management-backup.sh opt-twinbox"
+            f"TWINBOX_MANAGEMENT_BACKUP_CONFIG={config_file} {bootstrap_root}/bin/twinbox-management-backup.sh opt-twinbox"
             in cron_text
         )
 
         assert "restic_repo etcd" in runtime_text
         assert "restic_repo opt-twinbox" in runtime_text
         assert 'talosctl etcd snapshot "$snapshot_path"' in runtime_text
-        assert '--exclude "${host_root}/seaweedfs/data"' in runtime_text
+        assert '--exclude "${host_root}/seaweedfs/data"' not in runtime_text

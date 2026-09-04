@@ -21,8 +21,7 @@ TARGET_NAMESPACE="${TARGET_NAMESPACE:-twinbox-system}"
 CLUSTER_SECRET_STORE_NAME="${CLUSTER_SECRET_STORE_NAME:-openbao}"
 EXTERNAL_SECRET_NAME="${EXTERNAL_SECRET_NAME:-proxmox-bootstrap}"
 TARGET_SECRET_NAME="${TARGET_SECRET_NAME:-proxmox-bootstrap}"
-VELERO_SECRET_NAME="${VELERO_SECRET_NAME:-velero}"
-VELERO_SECRET_FILE="${VELERO_SECRET_FILE:-/opt/twinbox/bootstrap/secrets/global/velero.json}"
+BACKUP_STORAGE_SECRET_FILE="${BACKUP_STORAGE_SECRET_FILE:-}"
 
 detect_openbao_replicas() {
   printf '1\n'
@@ -43,6 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "${CLUSTER_ID:-}" ]] || { usage; fail "cluster-id required"; }
+BACKUP_STORAGE_SECRET_FILE="${BACKUP_STORAGE_SECRET_FILE:-/opt/twinbox/bootstrap/secrets/cluster/${CLUSTER_ID}/backup-storage/metadata.json}"
 [[ -n "${KUBECONFIG_FILE:-}" ]] || fail "KUBECONFIG_FILE is required"
 [[ -f "${KUBECONFIG_FILE:-}" ]] || fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
 CLUSTER_INSTANCE_ID="${TWINBOX_CLUSTER_INSTANCE_ID:-}"
@@ -144,12 +144,12 @@ openbao_wait_for_cluster_secret_store_ready
 openbao_wait_for_external_secret_ready "$TARGET_NAMESPACE" "$EXTERNAL_SECRET_NAME"
 openbao_wait_for_secret "$TARGET_SECRET_NAME" "$TARGET_NAMESPACE"
 
-if [[ -f "$VELERO_SECRET_FILE" ]]; then
-  openbao_log "Syncing SeaweedFS/Velero credentials to OpenBao"
-  openbao_sync_global_secret_file "$VELERO_SECRET_NAME" "$VELERO_SECRET_FILE" \
-    "mode" "endpoint" "bucket" "region" "username" "password"
+if [[ -f "$BACKUP_STORAGE_SECRET_FILE" ]]; then
+  openbao_log "Syncing cluster backup storage profile to OpenBao"
+  openbao_sync_secret_file "twinbox/cluster/${CLUSTER_ID}/backup-storage" "$BACKUP_STORAGE_SECRET_FILE" \
+    "mode" "endpoint" "region" "access_key_id" "secret_access_key" "buckets"
 else
-  openbao_log "SeaweedFS/Velero secret file not found at ${VELERO_SECRET_FILE}; skipping sync"
+  openbao_fail "Backup storage profile not found at ${BACKUP_STORAGE_SECRET_FILE}"
 fi
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
@@ -163,7 +163,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg external_secret_name "$EXTERNAL_SECRET_NAME" \
     --arg target_secret_name "$TARGET_SECRET_NAME" \
     --arg replicas "$OPENBAO_REPLICAS" \
-    --arg velero_secret_name "$VELERO_SECRET_NAME" \
+    --arg backup_storage_secret_path "twinbox/cluster/${CLUSTER_ID}/backup-storage" \
     '{
       cluster_id: $cluster_id,
       cluster_instance_id: $cluster_instance_id,
@@ -174,7 +174,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       external_secret_name: $external_secret_name,
       target_secret_name: $target_secret_name,
       openbao_replicas: ($replicas | tonumber),
-      velero_secret_name: $velero_secret_name
+      backup_storage_secret_path: $backup_storage_secret_path
     }' >"$STEP_RESULT_FILE"
 fi
 

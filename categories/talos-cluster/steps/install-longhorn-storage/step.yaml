@@ -5,6 +5,8 @@ journey_stage: setup
 summary: Apply the Longhorn GitOps application, make its storage class the cluster default, and enable maintenance-friendly drain settings.
 explanation: Twinbox installs Longhorn through a dedicated Argo CD application. The step waits until Argo reports the application healthy, marks StorageClass/longhorn as the cluster default, and applies maintenance-friendly drain defaults so Talos upgrades can drain on the fixed 3-worker cluster.
 side_help: Longhorn is an open-source distributed block storage system for Kubernetes that makes persistent volumes easy to deploy and manage.
+depends_on:
+  - configure-backup-storage
 dashy:
   items:
     - section: Platform

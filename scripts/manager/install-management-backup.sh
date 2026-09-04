@@ -5,12 +5,13 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/backup-storage-profile.sh"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 HOST_CRON_DIR="${TWINBOX_HOST_CRON_DIR:-/host/etc/cron.d}"
 HOST_REPO_ROOT="${TWINBOX_HOST_REPO_ROOT:-/opt/twinbox}"
 MANAGER_DATA_ROOT="${MANAGER_DATA_DIR:-${HOST_REPO_ROOT}/manager-data}"
-VELERO_SECRET_FILE="${BOOTSTRAP_ROOT}/secrets/global/velero.json"
-MANAGEMENT_BACKUP_FILE="${BOOTSTRAP_ROOT}/secrets/global/management-backup.json"
+MANAGEMENT_BACKUP_FILE=""
 RUNTIME_SCRIPT="${BOOTSTRAP_ROOT}/bin/twinbox-management-backup.sh"
 CRON_FILE="${HOST_CRON_DIR}/twinbox-management-backup"
 RETENTION_DAYS="${TWINBOX_MANAGEMENT_BACKUP_RETENTION_DAYS:-30}"
@@ -45,7 +46,8 @@ if [[ -z "$cluster_id" && -n "${STEP_CONTEXT_JSON:-}" ]]; then
 fi
 
 [[ -n "$cluster_id" ]] || fail "cluster id is required"
-[[ -f "$VELERO_SECRET_FILE" ]] || fail "Velero/SeaweedFS bootstrap secret not found at ${VELERO_SECRET_FILE}"
+MANAGEMENT_BACKUP_FILE="${BOOTSTRAP_ROOT}/secrets/cluster/${cluster_id}/management-backup/metadata.json"
+load_backup_storage_profile management
 
 cluster_state_file="${MANAGER_DATA_ROOT}/clusters/${cluster_id}.json"
 if [[ -f "$cluster_state_file" ]]; then
@@ -62,22 +64,11 @@ if [[ -z "$talosconfig_file" ]]; then
 fi
 [[ -f "$talosconfig_file" ]] || fail "talosconfig not found at ${talosconfig_file}"
 
-endpoint="$(jq -r '.endpoint // empty' "$VELERO_SECRET_FILE")"
-bucket="$(jq -r '.bucket // empty' "$VELERO_SECRET_FILE")"
-region="$(jq -r '.region // "seaweedfs"' "$VELERO_SECRET_FILE")"
-username="$(jq -r '.username // empty' "$VELERO_SECRET_FILE")"
-password="$(jq -r '.password // empty' "$VELERO_SECRET_FILE")"
-
-if [[ "$endpoint" == *".svc.cluster.local"* ]]; then
-  management_ip="${MANAGEMENT_VM_IP:-}"
-  [[ -n "$management_ip" ]] || fail "MANAGEMENT_VM_IP is required when Velero endpoint is cluster-internal"
-  endpoint="http://${management_ip}:8333"
-fi
-
-[[ -n "$endpoint" ]] || fail "SeaweedFS endpoint is missing in ${VELERO_SECRET_FILE}"
-[[ -n "$bucket" ]] || fail "SeaweedFS bucket is missing in ${VELERO_SECRET_FILE}"
-[[ -n "$username" ]] || fail "SeaweedFS username is missing in ${VELERO_SECRET_FILE}"
-[[ -n "$password" ]] || fail "SeaweedFS password is missing in ${VELERO_SECRET_FILE}"
+endpoint="$BACKUP_S3_ENDPOINT"
+bucket="$BACKUP_S3_BUCKET"
+region="$BACKUP_S3_REGION"
+username="$BACKUP_S3_ACCESS_KEY_ID"
+password="$BACKUP_S3_SECRET_ACCESS_KEY"
 
 mkdir -p "$(dirname "$MANAGEMENT_BACKUP_FILE")" "$(dirname "$RUNTIME_SCRIPT")"
 restic_password=""
@@ -89,12 +80,13 @@ if [[ -z "$restic_password" ]]; then
 fi
 
 jq -n \
-  --arg mode "seaweedfs" \
+  --arg mode "$BACKUP_S3_MODE" \
   --arg endpoint "$endpoint" \
   --arg bucket "$bucket" \
   --arg region "$region" \
   --arg username "$username" \
   --arg password "$password" \
+  --arg ca_file "$BACKUP_S3_CA_FILE" \
   --arg restic_password "$restic_password" \
   --arg cluster_id "$cluster_id" \
   --arg controlplane_ip "$controlplane_ip" \
@@ -108,15 +100,14 @@ jq -n \
     region: $region,
     username: $username,
     password: $password,
+    ca_file: $ca_file,
     restic_password: $restic_password,
     cluster_id: $cluster_id,
     controlplane_ip: $controlplane_ip,
     talosconfig: $talosconfig,
     host_root: $host_root,
     retention_days: $retention_days,
-    exclude_paths: [
-      ($host_root + "/seaweedfs/data")
-    ]
+    exclude_paths: []
   }' >"$MANAGEMENT_BACKUP_FILE"
 chmod 0600 "$MANAGEMENT_BACKUP_FILE"
 
@@ -154,6 +145,8 @@ restic_run() {
   AWS_SECRET_ACCESS_KEY="$(setting password)" \
   AWS_DEFAULT_REGION="$(setting region)" \
   AWS_REGION="$(setting region)" \
+  AWS_CA_BUNDLE="$(setting ca_file)" \
+  SSL_CERT_FILE="$(setting ca_file)" \
   RESTIC_PASSWORD="$(setting restic_password)" \
   RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-/var/cache/twinbox-restic}" \
     restic -r "$repo" "$@"
@@ -213,8 +206,7 @@ backup_opt_twinbox() {
   repo="$(restic_repo opt-twinbox)"
   ensure_repo "$repo"
   log "Backing up ${host_root}"
-  restic_run "$repo" backup "$host_root" \
-    --exclude "${host_root}/seaweedfs/data" >/dev/null
+  restic_run "$repo" backup "$host_root" >/dev/null
   forget_old "$repo"
 }
 
@@ -253,8 +245,8 @@ install -m 0644 /dev/stdin "$CRON_FILE" <<EOF
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-17 2 * * * root ${RUNTIME_SCRIPT} etcd >> ${HOST_REPO_ROOT}/manager-data/logs/management-backup.log 2>&1
-47 2 * * * root ${RUNTIME_SCRIPT} opt-twinbox >> ${HOST_REPO_ROOT}/manager-data/logs/management-backup.log 2>&1
+17 2 * * * root TWINBOX_MANAGEMENT_BACKUP_CONFIG=${MANAGEMENT_BACKUP_FILE} ${RUNTIME_SCRIPT} etcd >> ${HOST_REPO_ROOT}/manager-data/logs/management-backup.log 2>&1
+47 2 * * * root TWINBOX_MANAGEMENT_BACKUP_CONFIG=${MANAGEMENT_BACKUP_FILE} ${RUNTIME_SCRIPT} opt-twinbox >> ${HOST_REPO_ROOT}/manager-data/logs/management-backup.log 2>&1
 EOF
 
 log "Installed Management VM backup cron at ${CRON_FILE}"

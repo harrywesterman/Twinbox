@@ -2,9 +2,11 @@ id: install-velero-backup
 title: Install Velero backup
 type: action
 journey_stage: setup
-summary: Install Velero with the default SeaweedFS S3 target on the Management VM.
-explanation: Twinbox deploys Velero through Argo CD and points it at the SeaweedFS S3 service running on the Management VM with no setup-time choice between backup targets.
+summary: Install Velero with the configured cluster backup storage.
+explanation: Twinbox deploys Velero through Argo CD and points it at the cluster-bound S3-compatible backup profile.
 side_help: Velero gives the cluster a day-2 backup path for Kubernetes resources and filesystem-backed volume data.
+depends_on:
+  - configure-backup-storage
 inputs: []
 secrets:
   files:

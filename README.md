@@ -75,7 +75,7 @@ Twinbox installs a complete Kubernetes operations stack:
 | ---------------------- | ------------------------------------------------------------- |
 | Kubernetes foundation  | Talos Linux, Cilium, Hubble, Metrics Server                   |
 | GitOps and automation  | Argo CD, Argo CD Image Updater                                |
-| Storage and backups    | Longhorn, SeaweedFS, Velero, Velero UI, Barman Cloud          |
+| Storage and backups    | Longhorn, external S3 or backup SeaweedFS VM, Velero, Barman, PBS |
 | Ingress and networking | Traefik, Cloudflare Tunnel, NetBird, ExternalDNS              |
 | Identity and secrets   | Authentik, OpenBao, External Secrets Operator, Cert-Manager   |
 | Databases              | CloudNativePG, pgAdmin4                                       |

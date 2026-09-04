@@ -333,16 +333,14 @@ kubectl --kubeconfig <kubeconfig> get pods -n velero
 kubectl --kubeconfig <kubeconfig> get backupstoragelocation -n velero
 kubectl --kubeconfig <kubeconfig> get schedule -n velero twinbox-daily
 kubectl --kubeconfig <kubeconfig> get secret velero-credentials -n velero
-kubectl --kubeconfig <kubeconfig> get ingressroute -n longhorn-system seaweedfs seaweedfs-admin
 ```
 
 Expected:
 
 - Velero server and node-agent are running
-- SeaweedFS is running on the Management VM and exposed through Traefik
 - `BackupStorageLocation/default` is ready
 - The generated Velero credentials secret exists in the `velero` namespace
-- The Velero backup storage location points at the configured SeaweedFS endpoint
+- The Velero backup storage location points at the configured cluster S3 endpoint and Velero bucket
 - `Schedule/twinbox-daily` exists with 30-day retention
 
 ### `install-management-backup`
@@ -352,8 +350,7 @@ Run on the Management VM:
 ```bash
 sudo test -f /etc/cron.d/twinbox-management-backup
 sudo test -x /opt/twinbox/bootstrap/bin/twinbox-management-backup.sh
-sudo jq -r '.retention_days' /opt/twinbox/bootstrap/secrets/global/management-backup.json
-sudo grep -q '/opt/twinbox/seaweedfs/data' /opt/twinbox/bootstrap/secrets/global/management-backup.json
+sudo jq -r '.retention_days' /opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/management-backup.json
 ```
 
 Expected:
@@ -361,7 +358,15 @@ Expected:
 - The cron file exists and schedules daily `etcd` and `opt-twinbox` backup runs
 - The runtime backup script is executable
 - `management-backup.json` stores the restic repository settings with `retention_days` set to `30`
-- `/opt/twinbox/seaweedfs/data` is listed as an excluded path
+- The restic repository uses the cluster profile's Management bucket and a separate prefix from etcd snapshots
+
+### `install-proxmox-backup-server`
+
+```bash
+sudo jq '{vm_id,node,pve_storage_id,status,verification}' /opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/pbs/metadata.json
+```
+
+Expected: the dedicated PBS VM is ready, its S3 datastore is registered in Proxmox, the daily job excludes PBS and any local SeaweedFS VM, and the recorded backup/read verification succeeded.
 
 ### `install-velero-ui`
 

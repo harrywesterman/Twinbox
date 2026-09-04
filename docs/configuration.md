@@ -57,7 +57,8 @@ Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management
 - `/opt/twinbox/bootstrap/secrets/global/audiobookshelf.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero.json`
 - `/opt/twinbox/bootstrap/secrets/global/velero-ui.json`
-- `/opt/twinbox/bootstrap/secrets/global/management-backup.json`
+- `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/backup-storage/metadata.json`
+- `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/management-backup.json`
 - `/opt/twinbox/bootstrap/secrets/global/argocd-cli.json`
 - `/opt/twinbox/bootstrap/secrets/global/twinbox-portal.json`
 - `/opt/twinbox/bootstrap/secrets/global/dashy-oidc-<cluster-id>.json`
@@ -174,42 +175,40 @@ Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management
 
 `install-velero-ui` syncs this JSON into OpenBao, reuses it as the Velero UI bootstrap secret, and renders the Velero UI Helm chart with OIDC enabled and the admins-only policy file.
 
-### `velero.json`
+### Cluster backup-storage profile
 
 ```json
 {
-  "mode": "seaweedfs",
-  "endpoint": "http://192.168.1.50:8333",
-  "bucket": "twinbox-velero",
-  "region": "seaweedfs",
-  "username": "velero",
-  "password": "generated-password"
+  "mode": "external-s3",
+  "endpoint": "https://s3.example.com",
+  "region": "region-name",
+  "path_style": true,
+  "buckets": {
+    "databases": "cluster-databases",
+    "longhorn": "cluster-longhorn",
+    "velero": "cluster-velero",
+    "management": "cluster-management",
+    "pbs": "cluster-pbs"
+  }
 }
 ```
 
-`scripts/start-manager.sh` keeps this file aligned with the Management VM's SeaweedFS runtime credentials and endpoint, and `install-velero-backup` syncs the same JSON into OpenBao before rendering the Velero Application.
+The full profile is stored at `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/backup-storage/metadata.json`. Credentials and optional private CA material are secret; API state exposes only metadata and secret references.
 
 ### `management-backup.json`
 
 ```json
 {
-  "mode": "seaweedfs",
-  "endpoint": "http://192.168.1.50:8333",
-  "bucket": "twinbox-velero",
-  "region": "seaweedfs",
-  "username": "velero",
-  "password": "generated-password",
   "restic_password": "generated-password",
   "cluster_id": "cluster-id",
   "controlplane_ip": "192.168.1.101",
   "talosconfig": "/opt/twinbox/bootstrap/secrets/cluster/cluster-id/talosconfig/talosconfig",
   "host_root": "/opt/twinbox",
-  "retention_days": 30,
-  "exclude_paths": ["/opt/twinbox/seaweedfs/data"]
+  "retention_days": 30
 }
 ```
 
-`install-management-backup` writes this file on the Management VM and installs `/etc/cron.d/twinbox-management-backup`. The cron jobs create daily Talos etcd snapshots and restic backups of `/opt/twinbox` into SeaweedFS while excluding SeaweedFS object data.
+`install-management-backup` writes this cluster-scoped file and installs `/etc/cron.d/twinbox-management-backup`. The cron jobs use separate `etcd/` and `restic/` prefixes in the Management bucket.
 
 ### `argocd-cli.json`
 
@@ -287,7 +286,8 @@ Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management
 - `install-alloy` installs Grafana Alloy as the shared collector for Kubernetes logs, Kubernetes events, and OTLP traces.
 - Twinbox also seeds a small default alert set for Cilium and Longhorn so cluster network and storage health surface in Alertmanager and ntfy automatically, with warning, critical, and emergency alerts pushed to `ntfy.bierineenweek.nl` as different notification priorities.
 - `install-grafana` installs Grafana, provisions the Prometheus, Loki, and Tempo datasources automatically, seeds the default Managed Kubernetes Overview plus Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboards so the cluster starts with usable views for nodes, workloads, control plane, storage, logs, traffic, and ingress without manual UI setup, and stores Grafana's admin credentials alongside the OIDC client secret in OpenBao so Argo CD does not keep regenerating its admin Secret.
-- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and configures SeaweedFS S3 as Longhorn's default backup target. Longhorn is configured to run only on worker nodes so storage and CSI components stay off control planes. Twinbox also sets Longhorn's node drain policy to `allow-if-replica-is-stopped` and enables automatic detachment of manually attached volumes when a node is cordoned, which keeps Talos node upgrades workable on the small 3-worker cluster. New Longhorn PVCs inherit the default recurring job group, which creates snapshots every four hours and backups daily.
+- `configure-backup-storage` creates a cluster-scoped S3 profile. It either validates an external HTTPS S3 service or provisions a dedicated local SeaweedFS VM. The latter is not off-site protection. Credentials and private CA material remain in the bootstrap secret tree and OpenBao.
+- `install-longhorn-storage` installs Longhorn, makes it the default storage class, and uses the profile's dedicated Longhorn bucket. Longhorn remains worker-only and keeps the four-hour snapshot and daily backup jobs.
 - `install-secret-sync` installs:
   - External Secrets Operator
   - OpenBao with single-replica Raft storage on `longhorn-single`
@@ -303,8 +303,10 @@ Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management
 - `wizard/setup-wizard.sh` writes the chosen cluster login password to `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json` inside the Management VM so later bootstrap steps can reuse it without prompting again.
 - `create-users-and-groups` reads the Authentik bootstrap secret from OpenBao via the shared `authentik-auth.sh` helper, which loads the persistent `AUTHENTIK_API_TOKEN` (created by the blueprint) and uses it for all API calls. It creates the first Authentik user, creates the `admins` group as a superuser group, and adds the user to that group. The automation service account itself is also placed in a dedicated superuser group so it can set passwords and manage group membership during bootstrap.
 - All downstream steps that talk to the Authentik API (`install-headlamp`, `install-twinbox-portal`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
-- `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file. Velero creates a daily cluster backup with 30-day retention.
-- `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS. The `/opt/twinbox/seaweedfs/data` directory is excluded so the object store is not backed up into itself.
+- `install-velero-backup` uses the profile's Velero bucket and retains the daily schedule and 30-day retention.
+- `install-management-backup` writes Talos etcd snapshots and restic data to separate prefixes in the profile's Management bucket.
+- CloudNativePG ObjectStores are rendered per cluster into the database bucket with a distinct prefix per database.
+- `install-proxmox-backup-server` provisions PBS 4 with a persistent local cache and the reserved PBS bucket, registers a least-privilege token on all Proxmox nodes, and installs a daily job retaining 14 daily, 8 weekly, and 12 monthly backups.
 - `install-seaweedfs-object-store` installs a separate Kubernetes SeaweedFS deployment for app media. Its S3 endpoint is `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333`, Mastodon uses bucket `mastodon`, and public media is served from `s3.<ZONE_NAME>`. The admin UI is published as `s3-admin.<ZONE_NAME>` and appears in Dashy.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
@@ -366,8 +368,7 @@ All platform services use the runtime domain projection from the local Argo clus
 | Twinbox Portal | `portal.<ZONE_NAME>` |
 | Dashy admin launcher | `admin.<ZONE_NAME>` |
 | ntfy | `ntfy.<ZONE_NAME>` |
-| SeaweedFS | `seaweedfs.<ZONE_NAME>` |
-| SeaweedFS Admin | `seaweedfs-admin.<ZONE_NAME>` |
+| App-media SeaweedFS Admin | `s3-admin.<ZONE_NAME>` |
 | Forgejo | `forgejo.<ZONE_NAME>` |
 | Proxmox (proxy) | `proxmox.<ZONE_NAME>` |
 

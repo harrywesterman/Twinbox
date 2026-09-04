@@ -17,7 +17,6 @@ graph TB
                 API["manager-api<br/>Port 8080"]
                 Worker["manager-worker"]
                 Forgejo["Forgejo<br/>Port 3001"]
-                SeaweedFS["SeaweedFS<br/>S3:8333 / Filer:8888"]
             end
             Bootstrap["/opt/twinbox/bootstrap<br/>Secrets & Configs"]
             ManagerData["/opt/twinbox/manager-data<br/>State, Jobs, Queue"]
@@ -69,8 +68,12 @@ graph TB
     Worker -->|"Provision"| TalosCluster
     Worker -->|"Apply GitOps"| Argo
 
-    SeaweedFS -->|"S3 Backups"| Longhorn
-    SeaweedFS -->|"S3 Backups"| Velero
+    BackupS3["Cluster backup S3<br/>external or dedicated VM"]
+    PBS["Dedicated PBS 4 VM<br/>S3 datastore"]
+    BackupS3 -->|"S3 Backups"| Longhorn
+    BackupS3 -->|"S3 Backups"| Velero
+    BackupS3 -->|"S3 Backups"| DB
+    BackupS3 --> PBS
 
     Argo -->|"Sync"| Platform
     Argo -->|"Sync"| UserApps
@@ -108,8 +111,6 @@ Runs on the Management VM as Docker Compose services:
 | `manager-api` | `8080` | REST API for catalog, jobs, state |
 | `manager-worker` | — | Queue polling and job execution |
 | `forgejo` | `3001` | Local GitOps promotion gate for Twinbox repo |
-| `seaweedfs` | `8333` / `8888` | S3-compatible object store for backups |
-| `seaweedfs-admin` | `23646` | SeaweedFS admin dashboard |
 
 The `manager-api` and `manager-worker` images bundle:
 - `categories/` — wizard step manifests and runners
@@ -154,9 +155,12 @@ Scripts and step runners executed by `manager-worker`:
 - `scripts/manager/render-grafana-dashboard.mjs` — dashboard rendering
 
 **Backup**
-- `scripts/manager/install-velero-backup.sh` — Velero + SeaweedFS
+- `scripts/manager/configure-backup-storage.sh` — cluster-scoped S3 profile and validation
+- `scripts/manager/provision-seaweedfs-backup-vm.sh` — optional dedicated local S3 VM
+- `scripts/manager/install-velero-backup.sh` — Velero + cluster backup profile
 - `scripts/manager/install-velero-ui.sh` — Velero UI with OIDC
 - `scripts/manager/install-management-backup.sh` — host cron jobs
+- `scripts/manager/install-proxmox-backup-server.sh` — dedicated PBS VM and S3 datastore
 
 **Utility**
 - `scripts/manager/upsert-secret-artifact.mjs` — secret file attachments

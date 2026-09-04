@@ -989,14 +989,13 @@ def test_longhorn_step_installs_via_argocd_and_waits_for_health():
         'WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"'
         in step_text
     )
-    assert "management-ip.sh" in helper_text
+    assert "backup-storage-profile.sh" in helper_text
     assert 'manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"' in helper_text
     assert (
         'longhorn_single_storageclass_manifest="$WORKSPACE_ROOT/gitops/databases/longhorn-single-storageclass.yaml"'
         in helper_text
     )
     assert "hostname -I" not in helper_text
-    assert "resolve_management_vm_ip()" in MANAGEMENT_IP_HELPER.read_text(encoding="utf-8")
     assert "Installing Longhorn through Argo CD" in helper_text
     assert 'bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \\' in helper_text
     assert '--application "longhorn"' in helper_text
@@ -1141,11 +1140,11 @@ def test_seaweedfs_object_store_routes_use_s3_hosts_without_replacing_backup_rou
     )
     assert (
         'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_text
+        not in platform_ingress_text
     )
     assert (
         'seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_text
+        not in platform_ingress_text
     )
 
     assert "hostname: s3.__ZONE_NAME__" in mastodon_app_text
@@ -3493,11 +3492,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     )
     assert (
         'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
+        not in platform_ingress_app_text
     )
     assert (
         'seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
-        in platform_ingress_app_text
+        not in platform_ingress_app_text
     )
     assert "kind: ApplicationSet" in grafana_appset_text
     assert "name: grafana-set" in grafana_appset_text
@@ -4804,14 +4803,13 @@ def test_cnpg_database_clusters_have_seaweedfs_backups():
     assert "property: password" in backup_secret_text
 
 
-def test_install_secret_sync_also_populates_seaweedfs_backup_credentials():
+def test_install_secret_sync_populates_cluster_backup_storage_profile():
     text = INSTALL_SECRET_SYNC_SCRIPT.read_text(encoding="utf-8")
 
-    assert "velero.json" in text
-    assert "Syncing SeaweedFS/Velero credentials to OpenBao" in text
-    assert 'openbao_sync_global_secret_file "$VELERO_SECRET_NAME"' in text
-    assert '"mode" "endpoint" "bucket" "region" "username" "password"' in text
-    assert "velero_secret_name" in text
+    assert "backup-storage/metadata.json" in text
+    assert "Syncing cluster backup storage profile to OpenBao" in text
+    assert 'openbao_sync_secret_file "twinbox/cluster/${CLUSTER_ID}/backup-storage"' in text
+    assert "velero.json" not in text
 
 
 def test_loki_and_openbao_longhorn_sizes_are_right_sized():
@@ -5837,9 +5835,6 @@ def test_management_console_endpoints_use_placeholders():
     proxmox_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "proxmox-endpoints.yaml"
     ).read_text(encoding="utf-8")
-    seaweedfs_text = (
-        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-endpoints.yaml"
-    ).read_text(encoding="utf-8")
     webwizard_text = (
         REPO_ROOT / "gitops" / "platform" / "management-consoles" / "webwizard-endpoints.yaml"
     ).read_text(encoding="utf-8")
@@ -5854,7 +5849,6 @@ def test_management_console_endpoints_use_placeholders():
     ).read_text(encoding="utf-8")
 
     assert "ip: __PROXMOX_HOST_IP__" in proxmox_text
-    assert "ip: __MGMT_HOST_IP__" in seaweedfs_text
     assert "ip: __MGMT_HOST_IP__" in webwizard_text
     assert "ip: __MGMT_HOST_IP__" in forgejo_text
     assert "ip: __MGMT_HOST_IP__" in beszel_text
@@ -5886,7 +5880,7 @@ def test_management_console_endpoint_sync_verifies_rendered_endpoints():
         REPO_ROOT / "scripts" / "manager" / "ensure-management-endpoints.sh"
     ).read_text(encoding="utf-8")
 
-    assert "for endpoint_name in proxmox seaweedfs webwizard forgejo beszel" in endpoint_script_text
+    assert "for endpoint_name in proxmox webwizard forgejo beszel" in endpoint_script_text
     assert "kubectl -n longhorn-system get endpoints" in endpoint_script_text
     assert (
         "Endpoint ${endpoint_name} has no ready addresses or ports after apply"
@@ -5999,17 +5993,9 @@ def test_forgejo_management_console_route_uses_native_oidc_and_dashy_tile():
         assert icon_path.exists()
 
 
-def test_seaweedfs_admin_routes_to_the_admin_web_port():
-    text = (
-        REPO_ROOT / "gitops" / "platform" / "management-consoles" / "seaweedfs-ingressroute.yaml"
-    ).read_text(encoding="utf-8")
-    admin_text = (
-        REPO_ROOT
-        / "gitops"
-        / "platform"
-        / "management-consoles"
-        / "seaweedfs-admin-ingressroute.yaml"
-    ).read_text(encoding="utf-8")
+def test_cluster_native_seaweedfs_admin_routes_to_the_admin_web_port():
+    text = SEAWEEDFS_OBJECT_STORE_INGRESSROUTE.read_text(encoding="utf-8")
+    admin_text = text
 
     for media_prefix in (
         "/accounts",
@@ -6024,11 +6010,9 @@ def test_seaweedfs_admin_routes_to_the_admin_web_port():
     assert "prefix: /buckets/mastodon" in text
     assert text.count("name: authentik-forwardauth") == 2
     assert text.count("port: 8333") == 0
-    assert text.count("port: 8888") == 4
-    assert "port: 23646" not in text
-    assert "name: seaweedfs" in admin_text
+    assert text.count("port: 8888") == 2
+    assert "name: seaweedfs-admin" in admin_text
     assert "port: 23646" in admin_text
-    assert "port: 8888" not in admin_text
 
 
 def test_platform_ingress_keeps_seaweedfs_media_route_specific():
@@ -6080,7 +6064,7 @@ def test_hubble_authentik_callback_ingressroute_uses_the_real_host():
     assert "__ZONE_NAME__" not in hubble_callback_text
 
 
-def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
+def test_bootstrap_scripts_do_not_install_management_vm_seaweedfs():
     start_manager_text = START_MANAGER_SCRIPT.read_text(encoding="utf-8")
     bootstrap_vm_text = BOOTSTRAP_VM_SCRIPT.read_text(encoding="utf-8")
     helper_text = MANAGEMENT_IP_HELPER.read_text(encoding="utf-8")
@@ -6095,13 +6079,10 @@ def test_bootstrap_scripts_use_the_management_vm_ip_for_seaweedfs():
     assert "ip route get 1.1.1.1" in helper_text
     assert "192.168.1.50:8333" not in start_manager_text
     assert "192.168.1.50:8333" not in bootstrap_vm_text
-    assert start_manager_text.index("s3.configure --user") < start_manager_text.index(
-        "s3.bucket.create -name"
-    )
-    assert "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created" in start_manager_text
-    assert "ensure_seaweedfs_data_dir()" in bootstrap_vm_text
-    assert 'install -d -m 0755 "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
-    assert 'sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"' in bootstrap_vm_text
+    assert "s3.configure --user" not in start_manager_text
+    assert "s3.bucket.create -name" not in start_manager_text
+    assert "ensure_seaweedfs_data_dir()" not in bootstrap_vm_text
+    assert 'install -d -m 0755 "$TARGET_DIR/seaweedfs/data"' not in bootstrap_vm_text
 
 
 def test_authentik_consumer_scripts_read_from_openbao():

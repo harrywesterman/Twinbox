@@ -5,7 +5,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/management-ip.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup-storage-profile.sh"
 
 wait_for_storage_class() {
   local storage_class="${LONGHORN_STORAGE_CLASS:-longhorn}"
@@ -28,85 +28,26 @@ wait_for_storage_class() {
   done
 }
 
-render_secret_file() {
-  local endpoint="$1"
-  local bucket="$2"
-  local region="$3"
-  local username="$4"
-  local password="$5"
-
-  jq -n \
-    --arg mode "seaweedfs" \
-    --arg endpoint "$endpoint" \
-    --arg bucket "$bucket" \
-    --arg region "$region" \
-    --arg username "$username" \
-    --arg password "$password" \
-    '{
-      mode: $mode,
-      endpoint: $endpoint,
-      bucket: $bucket,
-      region: $region,
-      username: $username,
-      password: $password
-    }' >"$VELERO_SECRET_FILE"
-  chmod 0600 "$VELERO_SECRET_FILE"
-}
-
 load_longhorn_backup_settings() {
-  local endpoint=""
-  local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
-  local region="${SEAWEEDFS_REGION:-seaweedfs}"
-  local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
-  local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
-  local file_value=""
+  load_backup_storage_profile longhorn
+  LONGHORN_BACKUP_USERNAME="$BACKUP_S3_ACCESS_KEY_ID"
+  LONGHORN_BACKUP_PASSWORD="$BACKUP_S3_SECRET_ACCESS_KEY"
+  LONGHORN_BACKUP_TARGET="s3://${BACKUP_S3_BUCKET}@${BACKUP_S3_REGION}/"
 
-  if [[ -f "$VELERO_SECRET_FILE" ]]; then
-    file_value="$(jq -r '.endpoint // empty' "$VELERO_SECRET_FILE")"
-    [[ -n "$file_value" ]] && endpoint="$file_value"
-    file_value="$(jq -r '.bucket // empty' "$VELERO_SECRET_FILE")"
-    [[ -n "$file_value" ]] && bucket="$file_value"
-    file_value="$(jq -r '.region // empty' "$VELERO_SECRET_FILE")"
-    [[ -n "$file_value" ]] && region="$file_value"
-    file_value="$(jq -r '.username // empty' "$VELERO_SECRET_FILE")"
-    [[ -n "$file_value" ]] && username="$file_value"
-    file_value="$(jq -r '.password // empty' "$VELERO_SECRET_FILE")"
-    [[ -n "$file_value" ]] && password="$file_value"
-  fi
-
-  if [[ -z "$endpoint" ]]; then
-    local management_ip=""
-
-    if ! management_ip="$(resolve_management_vm_ip)"; then
-      fail "Could not determine management VM IP"
-    fi
-    endpoint="http://${management_ip}:8333"
-  fi
-
-  if [[ -z "$password" ]]; then
-    password="$(openssl rand -hex 16)"
-  fi
-
-  SEAWEEDFS_ENDPOINT="$endpoint"
-  SEAWEEDFS_BUCKET="$bucket"
-  SEAWEEDFS_REGION="$region"
-  LONGHORN_BACKUP_USERNAME="$username"
-  LONGHORN_BACKUP_PASSWORD="$password"
-  LONGHORN_BACKUP_TARGET="s3://${SEAWEEDFS_BUCKET}@${SEAWEEDFS_REGION}/"
-
-  export SEAWEEDFS_ENDPOINT SEAWEEDFS_BUCKET SEAWEEDFS_REGION
   export LONGHORN_BACKUP_USERNAME LONGHORN_BACKUP_PASSWORD LONGHORN_BACKUP_TARGET
-
-  mkdir -p "$(dirname "$VELERO_SECRET_FILE")"
-  render_secret_file "$SEAWEEDFS_ENDPOINT" "$SEAWEEDFS_BUCKET" "$SEAWEEDFS_REGION" "$LONGHORN_BACKUP_USERNAME" "$LONGHORN_BACKUP_PASSWORD"
 }
 
 create_or_update_longhorn_backup_secret() {
+  local ca_args=()
+  if [[ -n "$BACKUP_S3_CA_FILE" && -f "$BACKUP_S3_CA_FILE" ]]; then
+    ca_args+=(--from-file="AWS_CERT=${BACKUP_S3_CA_FILE}")
+  fi
   kubectl create namespace "$LONGHORN_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl -n "$LONGHORN_NAMESPACE" create secret generic "$LONGHORN_BACKUP_SECRET_NAME" \
     --from-literal=AWS_ACCESS_KEY_ID="$LONGHORN_BACKUP_USERNAME" \
     --from-literal=AWS_SECRET_ACCESS_KEY="$LONGHORN_BACKUP_PASSWORD" \
-    --from-literal=AWS_ENDPOINTS="$SEAWEEDFS_ENDPOINT" \
+    --from-literal=AWS_ENDPOINTS="$BACKUP_S3_ENDPOINT" \
+    "${ca_args[@]}" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
 
@@ -234,12 +175,11 @@ make_storage_class_default() {
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
-VELERO_SECRET_FILE="${BOOTSTRAP_ROOT}/secrets/global/velero.json"
 manifest_path="$WORKSPACE_ROOT/gitops/apps/longhorn.yaml"
 longhorn_single_storageclass_manifest="$WORKSPACE_ROOT/gitops/databases/longhorn-single-storageclass.yaml"
 LONGHORN_VALUES_TEMPLATE_PATH="${WORKSPACE_ROOT}/gitops/values/longhorn.yaml"
 LONGHORN_NAMESPACE="${LONGHORN_NAMESPACE:-longhorn-system}"
-LONGHORN_BACKUP_SECRET_NAME="${LONGHORN_BACKUP_SECRET_NAME:-longhorn-seaweedfs-backup}"
+LONGHORN_BACKUP_SECRET_NAME="${LONGHORN_BACKUP_SECRET_NAME:-longhorn-backup-s3}"
 cluster_id="${TWINBOX_CLUSTER_ID:-}"
 cluster_instance_id="${TWINBOX_CLUSTER_INSTANCE_ID:-}"
 

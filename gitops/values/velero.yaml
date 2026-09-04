@@ -1,5 +1,5 @@
 # Rendered into the Velero Argo CD Application by
-# scripts/manager/install-velero-backup.sh from /opt/twinbox/bootstrap/secrets/global/velero.json.
+# scripts/manager/install-velero-backup.sh from the cluster backup-storage profile.
 
 credentials:
   useSecret: true
@@ -10,15 +10,16 @@ configuration:
   backupStorageLocation:
     - name: default
       provider: aws
-      bucket: __SEAWEEDFS_BUCKET__
+      bucket: __BACKUP_S3_BUCKET__
       default: true
       credential:
         name: __VELERO_SECRET_NAME__
         key: cloud
+      caCert: __BACKUP_S3_CA_CERT__
       config:
-        region: __SEAWEEDFS_REGION__
-        s3ForcePathStyle: true
-        s3Url: __SEAWEEDFS_ENDPOINT__
+        region: __BACKUP_S3_REGION__
+        s3ForcePathStyle: __BACKUP_S3_PATH_STYLE__
+        s3Url: __BACKUP_S3_ENDPOINT__
 
 snapshotsEnabled: false
 defaultVolumesToFsBackup: true
