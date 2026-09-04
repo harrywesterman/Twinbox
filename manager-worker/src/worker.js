@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { spawn, spawnSync } from "child_process";
 import { buildRedactor } from "../../lib/secrets/redact.mjs";
+import { isAiConfigSyncJobType, redactAiConfigLine } from "./ai-config-sync.mjs";
 import {
   buildClusterWorkerSecretBundle,
   normalizeSecretBundle,
@@ -1471,10 +1472,10 @@ async function handleUninstallStep(job) {
   }
 }
 
-async function handleSyncAgentConfig(job) {
+async function handleSyncAiConfig(job) {
   const scriptPath = path.join(workspace, "scripts/manager/sync-twinbox-agents-config.sh");
   if (!fs.existsSync(scriptPath)) {
-    throw new Error(`sync_agent_config script not found: ${scriptPath}`);
+    throw new Error(`sync_ai_config script not found: ${scriptPath}`);
   }
   const clusterId = job.cluster_id || job.payload?.cluster_id || job.payload?.cluster?.id || "";
   const clusterInstanceId =
@@ -1494,12 +1495,7 @@ async function handleSyncAgentConfig(job) {
       TWINBOX_CLUSTER_ID: clusterId,
       TWINBOX_CLUSTER_INSTANCE_ID: clusterInstanceId,
     },
-    (line) => {
-      const redacted = line
-        .replace(/TWINBOX_AGENT_INTERNAL_TOKEN=\S+/g, "TWINBOX_AGENT_INTERNAL_TOKEN=***")
-        .replace(/OPENAI_API_KEY=\S+/g, "OPENAI_API_KEY=***");
-      return redacted;
-    },
+    redactAiConfigLine,
     []
   );
 }
@@ -1549,8 +1545,8 @@ async function handleJob(queueFile) {
         cluster_id: queued.cluster_id,
         cluster_instance_id: queued.cluster_instance_id,
       });
-    } else if (queued.type === "sync_agent_config") {
-      await handleSyncAgentConfig({
+    } else if (isAiConfigSyncJobType(queued.type)) {
+      await handleSyncAiConfig({
         id: queued.id,
         payload: queued.payload,
         cluster_id: queued.cluster_id,

@@ -167,6 +167,7 @@ test("queueAgentConfigSyncForLatestCluster includes latest cluster context", () 
 
     assert.equal(job.cluster_id, "new-cluster");
     assert.equal(job.cluster_instance_id, "new-instance");
+    assert.equal(job.type, "sync_ai_config");
     assert.equal(job.payload.cluster_id, "new-cluster");
     assert.equal(job.payload.cluster_instance_id, "new-instance");
     assert.equal(job.payload.reason, "test");

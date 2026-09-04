@@ -208,6 +208,28 @@ ensure_paperless_admin_group() {
     'from django.contrib.auth.models import Group, Permission; group, _ = Group.objects.get_or_create(name="admins"); group.permissions.set(Permission.objects.all()); print(f"Paperless admins group ready with {group.permissions.count()} permissions")'
 }
 
+sync_shared_ai_endpoint_if_configured() {
+  MANAGER_DATA_DIR="${MANAGER_DATA_DIR:-/data}"
+  if [[ ! -f "${MANAGER_DATA_DIR}/agents/provider.json" ]]; then
+    log "Shared AI endpoint is not configured; skipping Paperless AI sync"
+    return 0
+  fi
+
+  log "Syncing shared AI endpoint to Paperless"
+  MANAGER_DATA_DIR="$MANAGER_DATA_DIR" \
+  WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+  TWINBOX_BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${WORKSPACE_ROOT}/bootstrap}" \
+  TWINBOX_CLUSTER_ID="$cluster_id" \
+  TWINBOX_CLUSTER_INSTANCE_ID="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // empty')" \
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-twinbox-agents-config.sh"
+}
+
+ensure_shared_ai_secret_baseline() {
+  log "Ensuring shared AI endpoint secret baseline"
+  WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+  bash "$WORKSPACE_ROOT/scripts/manager/ensure-shared-ai-secret.sh"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -324,6 +346,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "paperless" \
   --json-file "$paperless_secret_file" \
   --required-keys "PAPERLESS_SECRET_KEY,PAPERLESS_ADMIN_USER,PAPERLESS_ADMIN_PASSWORD,PAPERLESS_ADMIN_MAIL,PAPERLESS_DBUSER,PAPERLESS_DBPASS,PAPERLESS_OIDC_CLIENT_ID,PAPERLESS_OIDC_CLIENT_SECRET,PAPERLESS_SOCIALACCOUNT_PROVIDERS"
+
+ensure_shared_ai_secret_baseline
 
 log "Provisioning Authentik OIDC client for Paperless-ngx"
 authorization_flow_id="$(authentik_resolve_flow_id "default-provider-authorization-implicit-consent" "authorization")"
@@ -443,3 +467,5 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "paperless" \
   --service-domain "paperless.${public_zone_name}" \
   --service-path /
+
+sync_shared_ai_endpoint_if_configured

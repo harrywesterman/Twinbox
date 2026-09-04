@@ -24,6 +24,10 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: openwebui-ai-provider
+                optional: true
           env:
             - name: WEBUI_URL
               value: https://openwebui.__ZONE_NAME__

@@ -56,6 +56,28 @@ wait_for_resources_ready() {
   done
 }
 
+sync_shared_ai_endpoint_if_configured() {
+  MANAGER_DATA_DIR="${MANAGER_DATA_DIR:-/data}"
+  if [[ ! -f "${MANAGER_DATA_DIR}/agents/provider.json" ]]; then
+    log "Shared AI endpoint is not configured; skipping Open WebUI AI sync"
+    return 0
+  fi
+
+  log "Syncing shared AI endpoint to Open WebUI"
+  MANAGER_DATA_DIR="$MANAGER_DATA_DIR" \
+  WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+  TWINBOX_BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-${WORKSPACE_ROOT}/bootstrap}" \
+  TWINBOX_CLUSTER_ID="$cluster_id" \
+  TWINBOX_CLUSTER_INSTANCE_ID="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id // .instance_id // empty')" \
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-twinbox-agents-config.sh"
+}
+
+ensure_shared_ai_secret_baseline() {
+  log "Ensuring shared AI endpoint secret baseline"
+  WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+  bash "$WORKSPACE_ROOT/scripts/manager/ensure-shared-ai-secret.sh"
+}
+
 cluster_json="$(printf '%s' "$STEP_CONTEXT_JSON" | jq -c '.cluster')"
 cluster_id="$(printf '%s' "$cluster_json" | jq -r '.id')"
 cluster_slug="$(printf '%s' "$cluster_json" | jq -r '.slug // .id')"
@@ -140,6 +162,8 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "openwebui" \
   --json-file "$openwebui_secret_file" \
   --required-keys "OPENWEBUI_POSTGRESQL__USERNAME,OPENWEBUI_POSTGRESQL__PASSWORD,OPENWEBUI_DATABASE_URL,WEBUI_SECRET_KEY,OAUTH_SESSION_TOKEN_ENCRYPTION_KEY,OAUTH_CLIENT_INFO_ENCRYPTION_KEY,OAUTH_CLIENT_ID,OAUTH_CLIENT_SECRET"
+
+ensure_shared_ai_secret_baseline
 
 resolve_scope_mapping_id() {
   authentik_resolve_scope_mapping_id "$1"
@@ -288,3 +312,5 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "openwebui" \
   --service-domain "openwebui.${public_zone_name}" \
   --service-path /
+
+sync_shared_ai_endpoint_if_configured

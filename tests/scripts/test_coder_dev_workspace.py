@@ -80,6 +80,13 @@ def test_coder_template_exposes_owned_dev_apps_and_rootless_netbird():
     assert 'service_account_name = "twinbox-dev-admin"' in text
     assert 'mount_path = "/opt/twinbox-opkssh/config.yml"' in text
     assert 'mount_path = "/home/coder/.opk/config.yml"' not in text
+    assert 'name  = "OPENCODE_CONFIG"' in text
+    assert 'value = "/opt/twinbox-opencode/opencode.json"' in text
+    assert 'name = "OPENAI_API_KEY"' in text
+    assert 'name = "coder-workspace-ai-provider"' in text
+    assert 'mount_path = "/opt/twinbox-opencode/opencode.json"' in text
+    assert 'secret_name = "coder-workspace-ai-provider"' in text
+    assert 'key  = "OPENCODE_CONFIG_JSON"' in text
     assert 'storage = "50Gi"' in text
     assert 'cpu    = "4"' in text
     assert 'memory = "8Gi"' in text
@@ -145,6 +152,10 @@ def test_workspace_namespace_grants_explicit_debug_access():
     assert 'memory: "8Gi"' in limit_text
     assert "twinbox/global/netbird-dev-workspaces" in externalsecret_text
     assert "twinbox/global/opkssh" in externalsecret_text
+    assert "name: coder-workspace-ai-provider" in externalsecret_text
+    assert "twinbox/global/twinbox-ai" in externalsecret_text
+    assert "OPENAI_API_KEY" in externalsecret_text
+    assert "OPENCODE_CONFIG_JSON" in externalsecret_text
 
     network_policy = (WORKSPACE_NAMESPACE / "networkpolicy.yaml").read_text(encoding="utf-8")
     assert "kind: NetworkPolicy" in network_policy

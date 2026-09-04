@@ -109,8 +109,12 @@ export function ensureAgentInternalToken(runtimeEnv) {
   return secrets.TWINBOX_AGENT_INTERNAL_TOKEN;
 }
 
+export function queueSharedAiConfigSync(dirs, cluster, payload) {
+  return queueJob(dirs, "sync_ai_config", cluster, payload);
+}
+
 export function queueAgentConfigSync(dirs, cluster, payload) {
-  return queueJob(dirs, "sync_agent_config", cluster, payload);
+  return queueSharedAiConfigSync(dirs, cluster, payload);
 }
 
 export function readLatestAgentCluster(dirs) {
@@ -133,7 +137,7 @@ export function readLatestAgentCluster(dirs) {
 
 export function queueAgentConfigSyncForLatestCluster(dirs, payload = {}) {
   const cluster = readLatestAgentCluster(dirs);
-  return queueAgentConfigSync(dirs, cluster?.id || "", {
+  return queueSharedAiConfigSync(dirs, cluster?.id || "", {
     ...payload,
     cluster_id: cluster?.id || null,
     cluster_instance_id: cluster?.cluster_instance_id || cluster?.instance_id || null,

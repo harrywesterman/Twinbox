@@ -41,6 +41,30 @@ spec:
                         OAUTH_PROVIDER_NAME: Authentik
                         OAUTH_SCOPE: "openid email profile"
                         OAUTH_WELLKNOWN_URL: 'https://authentik.{{index .metadata.annotations "twinbox.io/public-zone-name"}}/application/o/karakeep/.well-known/openid-configuration'
+                        OPENAI_BASE_URL:
+                          valueFrom:
+                            secretKeyRef:
+                              name: karakeep-ai-provider
+                              key: OPENAI_BASE_URL
+                              optional: true
+                        OPENAI_API_KEY:
+                          valueFrom:
+                            secretKeyRef:
+                              name: karakeep-ai-provider
+                              key: OPENAI_API_KEY
+                              optional: true
+                        INFERENCE_TEXT_MODEL:
+                          valueFrom:
+                            secretKeyRef:
+                              name: karakeep-ai-provider
+                              key: INFERENCE_TEXT_MODEL
+                              optional: true
+                        INFERENCE_IMAGE_MODEL:
+                          valueFrom:
+                            secretKeyRef:
+                              name: karakeep-ai-provider
+                              key: INFERENCE_IMAGE_MODEL
+                              optional: true
                       resources:
                         requests:
                           cpu: 100m

@@ -39,6 +39,9 @@ spec:
           envFrom:
             - secretRef:
                 name: paperless-config
+            - secretRef:
+                name: paperless-ai-provider
+                optional: true
           env:
             - name: USERMAP_UID
               value: "1000"

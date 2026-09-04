@@ -231,6 +231,23 @@ resource "kubernetes_deployment_v1" "workspace" {
             value = "1080"
           }
 
+          env {
+            name  = "OPENCODE_CONFIG"
+            value = "/opt/twinbox-opencode/opencode.json"
+          }
+
+          env {
+            name = "OPENAI_API_KEY"
+
+            value_from {
+              secret_key_ref {
+                name     = "coder-workspace-ai-provider"
+                key      = "OPENAI_API_KEY"
+                optional = true
+              }
+            }
+          }
+
           env_from {
             config_map_ref {
               name = "coder-workspace-access"
@@ -246,6 +263,13 @@ resource "kubernetes_deployment_v1" "workspace" {
             name       = "opkssh-config"
             mount_path = "/opt/twinbox-opkssh/config.yml"
             sub_path   = "config.yml"
+            read_only  = true
+          }
+
+          volume_mount {
+            name       = "opencode-config"
+            mount_path = "/opt/twinbox-opencode/opencode.json"
+            sub_path   = "opencode.json"
             read_only  = true
           }
 
@@ -339,6 +363,20 @@ resource "kubernetes_deployment_v1" "workspace" {
             items {
               key  = "config.yml"
               path = "config.yml"
+            }
+          }
+        }
+
+        volume {
+          name = "opencode-config"
+
+          secret {
+            secret_name = "coder-workspace-ai-provider"
+            optional    = true
+
+            items {
+              key  = "OPENCODE_CONFIG_JSON"
+              path = "opencode.json"
             }
           }
         }
