@@ -49,6 +49,10 @@ resource "netbird_group" "dev_workspaces" {
   name = "${local.name_prefix}-dev-workspaces"
 }
 
+resource "netbird_group" "backup_vms" {
+  name = "${local.name_prefix}-backup-vms"
+}
+
 resource "netbird_group" "exit_node_users" {
   name = "${local.name_prefix}-exit-node-users"
 }
@@ -137,6 +141,17 @@ resource "netbird_setup_key" "dev_workspaces" {
   usage_limit            = 0
   allow_extra_dns_labels = true
   auto_groups            = [netbird_group.dev_workspaces.id]
+  ephemeral              = false
+  revoked                = false
+}
+
+resource "netbird_setup_key" "backup_vms" {
+  name                   = "${local.name_prefix}-backup-vms"
+  type                   = "reusable"
+  expiry_seconds         = 0
+  usage_limit            = 2
+  allow_extra_dns_labels = true
+  auto_groups            = [netbird_group.backup_vms.id]
   ephemeral              = false
   revoked                = false
 }

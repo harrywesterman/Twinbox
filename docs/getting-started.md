@@ -47,7 +47,8 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 
 1. **Deploy Talos Cluster** (`provision-nodes`) — Creates VMs, bootstraps Talos, installs Cilium (kube-proxy-free with Hubble)
 2. **Install Argo CD** (`install-argocd`) — GitOps controller
-3. **Install Longhorn** (`install-longhorn-storage`) — Default storage class, SeaweedFS backup target
+3. **Configure backup storage** (`configure-backup-storage`) — External S3 or a dedicated local SeaweedFS VM
+4. **Install Longhorn** (`install-longhorn-storage`) — Default storage class and cluster S3 backup target
 4. **Install Prometheus** (`install-prometheus`) — Metrics and alerting stack
 5. **Install Loki** (`install-loki`) — Log aggregation
 6. **Install Tempo** (`install-tempo`) — Distributed tracing
@@ -74,9 +75,10 @@ Use the UI to work through the setup steps. The exact order depends on your chos
 ### Platform Services
 
 25. **Install Traefik** (`install-traefik`) — Ingress controller
-26. **Install Velero Backup** (`install-velero-backup`) — Cluster backups to SeaweedFS
+26. **Install Velero Backup** (`install-velero-backup`) — Cluster backups to the configured S3 profile
 27. **Install Velero UI** (`install-velero-ui`) — Backup dashboard with OIDC
 28. **Install Management Backup** (`install-management-backup`) — Host cron jobs for etcd + restic
+29. **Install Proxmox Backup Server** (`install-proxmox-backup-server`) — Dedicated PBS VM with S3 datastore
 29. **Install CrowdSec** (`install-crowdsec`) — IDS + Traefik bouncer
 30. **Install ntfy** (`install-ntfy`) — Push notifications for alerts
 31. **Install Browser SSH** (`install-browser-ssh`) — Termix browser shell to the Management VM and bastion, plus the opkssh Authentik app

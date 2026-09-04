@@ -44,6 +44,11 @@ output "dev_workspaces_group_id" {
   description = "NetBird group ID for Twinbox development workspace peers"
 }
 
+output "backup_vms_group_id" {
+  value       = netbird_group.backup_vms.id
+  description = "NetBird group ID for dedicated backup VMs"
+}
+
 output "exit_node_users_group_id" {
   value       = netbird_group.exit_node_users.id
   description = "NetBird group ID for peers allowed to opt into Twinbox routes"
@@ -92,5 +97,11 @@ output "browser_ssh_setup_key" {
 output "dev_workspaces_setup_key" {
   value       = netbird_setup_key.dev_workspaces.key
   description = "NetBird setup key for Twinbox development workspace peers"
+  sensitive   = true
+}
+
+output "backup_vms_setup_key" {
+  value       = netbird_setup_key.backup_vms.key
+  description = "NetBird setup key for dedicated backup VMs"
   sensitive   = true
 }

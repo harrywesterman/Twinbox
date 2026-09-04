@@ -1432,6 +1432,7 @@ bastion_exit_router_setup_key="$(tofu output -raw -no-color bastion_exit_router_
 mailu_relay_egress_setup_key="$(tofu output -raw -no-color mailu_relay_egress_setup_key)"
 browser_ssh_setup_key="$(tofu output -raw -no-color browser_ssh_setup_key)"
 dev_workspaces_setup_key="$(tofu output -raw -no-color dev_workspaces_setup_key)"
+backup_vms_setup_key="$(tofu output -raw -no-color backup_vms_setup_key)"
 admins_group_id="$(tofu output -raw -no-color admins_group_id)"
 management_vm_group_id="$(tofu output -raw -no-color management_vm_group_id)"
 k8s_routers_group_id="$(tofu output -raw -no-color k8s_routers_group_id)"
@@ -1445,6 +1446,9 @@ dev_workspaces_group_id="$(tofu output -raw -no-color dev_workspaces_group_id)"
 exit_node_users_group_id="$(tofu output -raw -no-color exit_node_users_group_id)"
 traefik_resource_id="$(tofu output -raw -no-color traefik_resource_id)"
 
+NETBIRD_SETUP_KEY="$backup_vms_setup_key" NETBIRD_MANAGEMENT_URL="$netbird_management_url" \
+  bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vms-netbird.sh"
+
 secrets_dir="/opt/twinbox/bootstrap/secrets/global"
 mkdir -p "$secrets_dir"
 routing_secret="$secrets_dir/netbird-routing-peers-${cluster_id}.json"
@@ -1455,7 +1459,15 @@ bastion_exit_router_secret="$secrets_dir/netbird-bastion-exit-router-${cluster_i
 mailu_relay_egress_secret="$secrets_dir/netbird-mailu-relay-egress-${cluster_id}.json"
 browser_ssh_secret="$secrets_dir/netbird-browser-ssh-${cluster_id}.json"
 dev_workspaces_secret="$secrets_dir/netbird-dev-workspaces-${cluster_id}.json"
+backup_vms_secret="/opt/twinbox/bootstrap/secrets/cluster/${cluster_id}/netbird-backup-vms/metadata.json"
+mkdir -p "$(dirname "$backup_vms_secret")"
 network_secret="$secrets_dir/netbird-network-${cluster_id}.json"
+
+jq -n \
+  --arg setup_key "$backup_vms_setup_key" \
+  --arg management_url "$netbird_management_url" \
+  --arg cluster_id "$cluster_id" \
+  '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, CLUSTER_ID: $cluster_id}' >"$backup_vms_secret"
 
 jq -n \
   --arg setup_key "$k8s_setup_key" \
@@ -1510,7 +1522,7 @@ jq -n \
   --arg cluster_id "$cluster_id" \
   '{NB_SETUP_KEY: $setup_key, NB_MANAGEMENT_URL: $management_url, CLUSTER_ID: $cluster_id}' >"$dev_workspaces_secret"
 
-chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret" "$mailu_relay_egress_secret" "$browser_ssh_secret" "$dev_workspaces_secret"
+chmod 600 "$routing_secret" "$admin_secret" "$management_lan_router_secret" "$proxy_secret" "$bastion_exit_router_secret" "$mailu_relay_egress_secret" "$browser_ssh_secret" "$dev_workspaces_secret" "$backup_vms_secret"
 
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "netbird-routing-peers" \
