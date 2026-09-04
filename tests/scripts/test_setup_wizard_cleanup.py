@@ -184,10 +184,7 @@ def test_setup_wizard_applies_cloud_init_user_and_dns_to_vm():
     assert "      TALOS_ISO_FILE=${TALOS_ISO_FILE}" not in text
     assert "  - install -m 0755 -d /opt/twinbox/bootstrap/ansible" in text
     assert "  - install -m 0755 -d /opt/twinbox/manager-data" in text
-    assert (
-        "  - install -m 0755 -d -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /opt/twinbox/seaweedfs/data"
-        in text
-    )
+    assert "/opt/twinbox/seaweedfs/data" not in text
     assert (
         "  - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env"
         in text
@@ -232,7 +229,7 @@ def test_setup_wizard_bootstraps_filesystem_secret_material_before_starting_mana
     assert "TWINBOX_SECRET_ITEM_PREFIX=twinbox" in text
     assert "TWINBOX_SECRET_TEMP_DIR=/tmp/twinbox-secrets" in text
     assert "TWINBOX_SECRET_CACHE_TTL_SEC=60" in text
-    assert "python3 /tmp/twinbox-write-velero-secret.py" in text
+    assert "twinbox-write-velero-secret.py" not in text
     assert (
         "bash -lc 'set -a; source ${TWINBOX_TARGET_DIR}/.env; set +a; cd ${TWINBOX_TARGET_DIR} && ansible-playbook -i localhost, -c local /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'"
         in text

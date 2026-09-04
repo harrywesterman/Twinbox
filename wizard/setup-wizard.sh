@@ -1376,15 +1376,9 @@ create_management_vm() {
   local img_path="/var/lib/vz/template/cache/${img_name}"
   local CLOUD_INIT_PASSWORD_HASH=""
   local CLOUD_INIT_PASSWORD_B64=""
-  local SEAWEEDFS_ACCESS_KEY_ID=""
-  local SEAWEEDFS_SECRET_ACCESS_KEY=""
-  local SEAWEEDFS_BUCKET="twinbox-velero"
-  local SEAWEEDFS_REGION="seaweedfs"
 
 
   CLOUD_INIT_PASSWORD_B64=$(printf '%s' "$CLOUD_INIT_PASSWORD" | base64 -w0)
-  SEAWEEDFS_ACCESS_KEY_ID="velero"
-  SEAWEEDFS_SECRET_ACCESS_KEY="$(openssl rand -hex 16)"
 
   mkdir -p /var/lib/vz/template/cache /var/lib/vz/snippets
 
@@ -1451,10 +1445,6 @@ write_files:
       TWINBOX_IMAGE_TAG=${TWINBOX_IMAGE_TAG}
       TWINBOX_HOST_REPO_ROOT=${TWINBOX_TARGET_DIR}
       MANAGEMENT_VM_ID=${MGT_ID}
-      SEAWEEDFS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY_ID}
-      SEAWEEDFS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_ACCESS_KEY}
-      SEAWEEDFS_BUCKET=${SEAWEEDFS_BUCKET}
-      SEAWEEDFS_REGION=${SEAWEEDFS_REGION}
   - path: /tmp/twinbox.cluster-login-password.b64
     permissions: '0600'
     owner: root:root
@@ -1477,33 +1467,6 @@ write_files:
           encoding="utf-8",
       )
       target.chmod(0o600)
-  - path: /tmp/twinbox-write-velero-secret.py
-    permissions: '0755'
-    owner: root:root
-    content: |
-      #!/usr/bin/env python3
-      import json
-      import pathlib
-
-      env_file = pathlib.Path("/tmp/twinbox.env.template")
-      env = {}
-      for line in env_file.read_text(encoding="utf-8").splitlines():
-          if "=" not in line or line.lstrip().startswith("#"):
-              continue
-          key, value = line.split("=", 1)
-          env[key] = value
-
-      target = pathlib.Path("/opt/twinbox/bootstrap/secrets/global/velero.json")
-      payload = {
-          "mode": "seaweedfs",
-          "endpoint": f"http://{env['MANAGEMENT_VM_IP']}:8333",
-          "bucket": env["SEAWEEDFS_BUCKET"],
-          "region": env["SEAWEEDFS_REGION"],
-          "username": env["SEAWEEDFS_ACCESS_KEY_ID"],
-          "password": env["SEAWEEDFS_SECRET_ACCESS_KEY"],
-      }
-      target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-      target.chmod(0o600)
 runcmd:
   - install -m 0755 -d /opt/twinbox/bootstrap/ansible
   - install -m 0755 -d /opt/twinbox/bootstrap/config
@@ -1513,9 +1476,7 @@ runcmd:
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/seal
   - install -m 0755 -d /opt/twinbox/bootstrap/openbao/init
   - install -m 0755 -d /opt/twinbox/manager-data
-  - install -m 0755 -d -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /opt/twinbox/seaweedfs/data
   - python3 /tmp/twinbox-write-cluster-login-secret.py
-  - python3 /tmp/twinbox-write-velero-secret.py
   - install -m 0600 -o ${CLOUD_INIT_USER} -g ${CLOUD_INIT_USER} /tmp/twinbox.env.template ${TWINBOX_TARGET_DIR}/.env
   - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/ansible/management-vm-maintenance.yml" -o /opt/twinbox/bootstrap/ansible/management-vm-maintenance.yml'
   - bash -lc 'curl -fsSL "${TWINBOX_RAW_BASE_URL}/config/pinned-defaults.sh" -o /opt/twinbox/bootstrap/config/pinned-defaults.sh'

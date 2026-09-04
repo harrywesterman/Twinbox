@@ -133,6 +133,35 @@ def test_put_wizard_state_normalizes_and_persists():
             proc.wait(timeout=5)
 
 
+def test_wizard_state_never_persists_s3_credentials():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir, port, env = _default_env(td)
+        proc = _spawn_server(data_dir, port, env)
+        try:
+            _wait_for_health(f"http://127.0.0.1:{port}")
+            payload = {
+                "answers": {
+                    "configure-backup-storage": {
+                        "backup_storage_mode": "external-s3",
+                        "s3_endpoint": "https://s3.example.com",
+                        "s3_access_key_id": "must-not-persist",
+                        "s3_secret_access_key": "must-not-persist",
+                    }
+                }
+            }
+            status, body = _put_json(f"http://127.0.0.1:{port}/api/wizard/state", payload)
+            assert status == 200
+            saved = body["answers"]["configure-backup-storage"]
+            assert saved == {
+                "backup_storage_mode": "external-s3",
+                "s3_endpoint": "https://s3.example.com",
+            }
+            assert "must-not-persist" not in (data_dir / "wizard-state.json").read_text()
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_put_wizard_state_normalizes_invalid_fields():
     with tempfile.TemporaryDirectory() as td:
         data_dir, port, env = _default_env(td)

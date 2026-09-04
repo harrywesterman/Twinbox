@@ -20,6 +20,7 @@ import { computePlacement } from "./lib/placement.js";
 import {
   buildAppCatalogResponse,
   buildCatalogResponse,
+  partitionStepInputs,
   validateStepInputs,
 } from "./lib/catalog.js";
 import {
@@ -72,6 +73,7 @@ import {
   secretRoot,
   clusterSecretDir,
   itemPrefix,
+  writeItemRecord,
 } from "../../lib/secrets/filesystem-store.mjs";
 
 const app = express();
@@ -1310,6 +1312,18 @@ function writeStepState(stepId, patch, clusterScope = null) {
   return next;
 }
 
+function prepareStepInputs(step, normalizedInputs, clusterId) {
+  const { publicInputs, secretFields } = partitionStepInputs(step, normalizedInputs);
+  if (Object.keys(secretFields).length === 0) {
+    return publicInputs;
+  }
+
+  const secretRef = { scope: "cluster", item: "backup-storage-pending", cluster_id: clusterId };
+  const existing = readItemRecord(process.env, secretRef, { clusterId }) || {};
+  writeItemRecord(process.env, secretRef, { ...existing, ...secretFields }, { clusterId });
+  return publicInputs;
+}
+
 function parseSecretKeyPath(secretKeyPath) {
   const segments = String(secretKeyPath || "")
     .split("/")
@@ -1525,11 +1539,12 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
   if (!validated.ok) {
     return res.status(400).json({ error: validated.error });
   }
+  const jobInputs = prepareStepInputs(step, validated.value, activeCluster.id);
 
   const payload = {
     step_id: step.id,
     step_type: step.type,
-    inputs: validated.value,
+    inputs: jobInputs,
     runner: step.runner,
     context: { cluster: activeCluster },
   };
@@ -1547,7 +1562,7 @@ app.post("/api/apps/:stepId/install", async (req, res) => {
     step.id,
     {
       status: "pending",
-      inputs: validated.value,
+      inputs: jobInputs,
       outputs: null,
       error: null,
       last_job_id: job.id,
@@ -1960,10 +1975,11 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     context = { cluster: requestedCluster.cluster };
   }
 
+  const jobInputs = prepareStepInputs(step, validated.value, clusterId);
   const payload = {
     step_id: step.id,
     step_type: step.type,
-    inputs: validated.value,
+    inputs: jobInputs,
     runner: step.runner,
     context,
   };
@@ -1983,7 +1999,7 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     step.id,
     {
       status: "pending",
-      inputs: validated.value,
+      inputs: jobInputs,
       outputs: null,
       error: null,
       last_job_id: job.id,
@@ -2343,11 +2359,17 @@ function normalizeWizardState(value = {}) {
     value.answers && typeof value.answers === "object" && !Array.isArray(value.answers)
       ? value.answers
       : {};
+  const sanitizedAnswers = structuredClone(answers);
+  for (const stepAnswers of Object.values(sanitizedAnswers)) {
+    if (!stepAnswers || typeof stepAnswers !== "object" || Array.isArray(stepAnswers)) continue;
+    delete stepAnswers.s3_access_key_id;
+    delete stepAnswers.s3_secret_access_key;
+  }
 
   return {
     selectedStepId: typeof value.selectedStepId === "string" ? value.selectedStepId : "",
     wizardPhase: value.wizardPhase === "install" ? "install" : "questions",
-    answers,
+    answers: sanitizedAnswers,
     clusterId: typeof value.clusterId === "string" ? value.clusterId : "",
     clusterCreatedAt: typeof value.clusterCreatedAt === "string" ? value.clusterCreatedAt : "",
     clusterInstanceId: typeof value.clusterInstanceId === "string" ? value.clusterInstanceId : "",

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import shutil
@@ -72,6 +74,7 @@ EOF
     env["MANAGER_DATA_DIR"] = str(data_dir)
     env["MANAGER_API_PORT"] = str(port)
     env["WORKSPACE_ROOT"] = str(REPO_ROOT)
+    env["TWINBOX_BOOTSTRAP_DIR"] = str(data_dir / "bootstrap")
     env["MANAGER_API_PING_BIN"] = str(ping_mock)
     env["MANAGER_API_CLUSTER_RESOURCES_BIN"] = str(vm_mock)
     return subprocess.Popen(
@@ -82,6 +85,79 @@ EOF
         stderr=subprocess.PIPE,
         text=True,
     )
+
+
+def test_backup_storage_secret_inputs_never_enter_job_or_step_state():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        port = _find_free_port()
+        cluster_id = "backup-test"
+        instance_id = "backup-test-instance"
+        (data_dir / "clusters").mkdir(parents=True, exist_ok=True)
+        _cluster_step_state(data_dir, instance_id, "provision-nodes").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        (data_dir / "clusters" / f"{cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": cluster_id,
+                    "slug": "backup-test",
+                    "cluster_instance_id": instance_id,
+                    "status": "bootstrapped",
+                }
+            ),
+            encoding="utf-8",
+        )
+        _cluster_step_state(data_dir, instance_id, "provision-nodes").write_text(
+            json.dumps({"status": "succeeded", "inputs": {}, "outputs": {}}),
+            encoding="utf-8",
+        )
+
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+            status, body = _post_json(
+                f"{base}/api/steps/configure-backup-storage/execute",
+                {
+                    "cluster_id": cluster_id,
+                    "cluster_instance_id": instance_id,
+                    "inputs": {
+                        "backup_storage_mode": "external-s3",
+                        "s3_endpoint": "https://s3.example.com",
+                        "s3_region": "eu-west-1",
+                        "s3_access_key_id": "access-secret",
+                        "s3_secret_access_key": "top-secret",
+                        "s3_path_style": True,
+                    },
+                },
+            )
+            assert status == 202, body
+
+            job = json.loads((data_dir / "jobs" / f"{body['job_id']}.json").read_text())
+            state = json.loads(
+                _cluster_step_state(data_dir, instance_id, "configure-backup-storage").read_text()
+            )
+            serialized = json.dumps({"job": job, "state": state})
+            assert "access-secret" not in serialized
+            assert "top-secret" not in serialized
+            assert job["payload"]["inputs"]["s3_endpoint"] == "https://s3.example.com"
+
+            secret = json.loads(
+                (
+                    data_dir
+                    / "bootstrap/secrets/cluster"
+                    / cluster_id
+                    / "backup-storage-pending/metadata.json"
+                ).read_text()
+            )
+            assert secret == {
+                "access_key_id": "access-secret",
+                "secret_access_key": "top-secret",
+            }
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
 
 
 def _global_step_state(data_dir: Path, step_id: str) -> Path:

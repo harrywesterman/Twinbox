@@ -1,0 +1,108 @@
+id: configure-backup-storage
+title: Configure backup storage
+type: config
+journey_stage: setup
+summary: Configure the cluster-wide S3-compatible backup target.
+explanation: Use an existing external S3-compatible service or let Twinbox provision a dedicated SeaweedFS backup VM. External credentials are stored as cluster secrets and are never written to job state or logs.
+side_help: External S3 provides off-site protection. A managed SeaweedFS VM is local backup storage and does not protect against failure of the complete Proxmox environment.
+depends_on:
+  - provision-nodes
+inputs:
+  - id: backup_storage_mode
+    label: Backup storage
+    type: string
+    required: true
+    default: external-s3
+    options:
+      - label: Existing external S3
+        value: external-s3
+      - label: Dedicated SeaweedFS VM
+        value: managed-seaweedfs
+    help: Choose an off-site S3 service when available.
+  - id: s3_endpoint
+    label: S3 endpoint
+    type: string
+    required: true
+    help: Required for external S3; use an HTTPS URL.
+    visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: s3_region
+    label: S3 region
+    type: string
+    required: true
+    default: us-east-1
+    help: Provider region used for request signing.
+    visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: s3_access_key_id
+    label: S3 access key ID
+    type: string
+    required: true
+    sensitive: true
+    secret_field: access_key_id
+    help: Required for external S3.
+    visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: s3_secret_access_key
+    label: S3 secret access key
+    type: password
+    required: true
+    sensitive: true
+    secret_field: secret_access_key
+    help: Required for external S3 and stored only in the cluster secret store.
+    visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: s3_path_style
+    label: Force path-style S3
+    type: boolean
+    required: true
+    default: true
+    help: Recommended for generic S3-compatible services.
+    visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: seaweedfs_datastore
+    label: SeaweedFS Proxmox datastore
+    type: string
+    required: true
+    help: Used only when Twinbox provisions a dedicated SeaweedFS VM.
+    visible_when: { input: backup_storage_mode, equals: managed-seaweedfs }
+  - id: seaweedfs_data_disk_gb
+    label: SeaweedFS data disk (GiB)
+    type: integer
+    required: true
+    min: 100
+    default: 500
+    help: Persistent backup capacity for the dedicated VM.
+    visible_when: { input: backup_storage_mode, equals: managed-seaweedfs }
+  - id: seaweedfs_ip
+    label: SeaweedFS VM IP
+    type: ipv4
+    required: true
+    help: Free static address discovered from the cluster network.
+    visible_when: { input: backup_storage_mode, equals: managed-seaweedfs }
+secrets:
+  env:
+    BACKUP_S3_ACCESS_KEY_ID:
+      scope: cluster
+      item: backup-storage-pending
+      field: access_key_id
+      optional: true
+    BACKUP_S3_SECRET_ACCESS_KEY:
+      scope: cluster
+      item: backup-storage-pending
+      field: secret_access_key
+      optional: true
+    PROXMOX_HOST:
+      scope: global
+      item: proxmox
+      field: host
+    PROXMOX_PORT:
+      scope: global
+      item: proxmox
+      field: port
+    PROXMOX_USER:
+      scope: global
+      item: proxmox
+      field: username
+    PROXMOX_PASSWORD:
+      scope: global
+      item: proxmox
+      field: password
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-backup-storage/run.sh

@@ -18,7 +18,7 @@ fi
 proxmox_ip="${PROXMOX_HOST:-}"
 [[ -n "$proxmox_ip" ]] || fail "PROXMOX_HOST is required to render management endpoints"
 
-for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-endpoints.yaml forgejo-endpoints.yaml beszel-endpoints.yaml; do
+for endpoint_file in proxmox-endpoints.yaml webwizard-endpoints.yaml forgejo-endpoints.yaml beszel-endpoints.yaml; do
   template="$PLATFORM_DIR/management-consoles/$endpoint_file"
   [[ -f "$template" ]] || fail "Endpoint template not found: $template"
 
@@ -31,7 +31,7 @@ for endpoint_file in proxmox-endpoints.yaml seaweedfs-endpoints.yaml webwizard-e
   kubectl apply -f - <<<"$rendered"
 done
 
-for endpoint_name in proxmox seaweedfs webwizard forgejo beszel; do
+for endpoint_name in proxmox webwizard forgejo beszel; do
   status="$(
     kubectl -n longhorn-system get endpoints "$endpoint_name" -o json \
       | jq -r '

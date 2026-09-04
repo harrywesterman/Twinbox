@@ -12,6 +12,7 @@ function fallbackCatalog() {
 
 const FIXED_SETUP_STEP_IDS = [
   "provision-nodes",
+  "configure-backup-storage",
   "install-argocd",
   "install-longhorn-storage",
   "install-secret-sync",

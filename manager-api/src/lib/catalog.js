@@ -720,6 +720,12 @@ export function validateStepInputs(step, bodyInputs) {
   const normalized = {};
 
   for (const input of step.inputs) {
+    if (
+      input.visible_when &&
+      String(inputs[input.visible_when.input] ?? "") !== input.visible_when.equals
+    ) {
+      continue;
+    }
     let value = inputs[input.id];
     const hasValue = value !== undefined && value !== null && value !== "";
 
@@ -735,7 +741,7 @@ export function validateStepInputs(step, bodyInputs) {
       continue;
     }
 
-    if (input.type === "string") {
+    if (input.type === "string" || input.type === "password") {
       const parsed = input.required
         ? parseRequiredString(value, input.id)
         : { ok: true, value: String(value).trim() };
@@ -783,4 +789,25 @@ export function validateStepInputs(step, bodyInputs) {
   }
 
   return { ok: true, value: normalized };
+}
+
+export function partitionStepInputs(step, normalizedInputs = {}) {
+  const publicInputs = {};
+  const secretFields = {};
+  const definitions = new Map((step.inputs || []).map((input) => [input.id, input]));
+
+  for (const [inputId, value] of Object.entries(normalizedInputs)) {
+    const definition = definitions.get(inputId);
+    if (definition?.sensitive) {
+      const secretField = String(definition.secret_field || inputId).trim();
+      if (!secretField) {
+        throw new Error(`sensitive input ${inputId} requires secret_field`);
+      }
+      secretFields[secretField] = value;
+    } else {
+      publicInputs[inputId] = value;
+    }
+  }
+
+  return { publicInputs, secretFields };
 }

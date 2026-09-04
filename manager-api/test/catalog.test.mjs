@@ -4,12 +4,71 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-import { buildAppCatalogResponse, buildCatalogResponse } from "../src/lib/catalog.js";
+import {
+  buildAppCatalogResponse,
+  buildCatalogResponse,
+  partitionStepInputs,
+  validateStepInputs,
+} from "../src/lib/catalog.js";
 import {
   buildClusterWorkerSecretBundle,
   buildSecretAttachmentRef,
   mergeSecretBundles,
 } from "../../lib/secrets/schema.mjs";
+
+test("password inputs validate and sensitive values are partitioned out of job inputs", () => {
+  const step = {
+    inputs: [
+      { id: "endpoint", type: "string", required: true },
+      {
+        id: "secret",
+        type: "password",
+        required: true,
+        sensitive: true,
+        secret_field: "secret_access_key",
+      },
+    ],
+  };
+
+  const validated = validateStepInputs(step, {
+    endpoint: "https://s3.example.com",
+    secret: "do-not-persist",
+  });
+  assert.equal(validated.ok, true);
+  assert.deepEqual(partitionStepInputs(step, validated.value), {
+    publicInputs: { endpoint: "https://s3.example.com" },
+    secretFields: { secret_access_key: "do-not-persist" },
+  });
+});
+
+test("conditional backup fields are required only for the selected mode", () => {
+  const step = {
+    inputs: [
+      { id: "mode", type: "string", required: true },
+      {
+        id: "endpoint",
+        type: "string",
+        required: true,
+        visible_when: { input: "mode", equals: "external" },
+      },
+      {
+        id: "datastore",
+        type: "string",
+        required: true,
+        visible_when: { input: "mode", equals: "managed" },
+      },
+    ],
+  };
+  assert.equal(validateStepInputs(step, { mode: "external" }).error, "endpoint is required");
+  assert.deepEqual(validateStepInputs(step, { mode: "external", endpoint: "https://s3" }), {
+    ok: true,
+    value: { mode: "external", endpoint: "https://s3" },
+  });
+  assert.deepEqual(validateStepInputs(step, { mode: "managed", datastore: "backup" }), {
+    ok: true,
+    value: { mode: "managed", datastore: "backup" },
+  });
+});
 
 test("catalog prefers the persisted cluster identity over the VM slug when a cluster exists", () => {
   const originalClusterSlug = process.env.TWINBOX_CLUSTER_SLUG;

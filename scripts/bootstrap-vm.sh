@@ -61,10 +61,8 @@ ensure_bootstrap_material() {
   local openbao_init_dir="${BOOTSTRAP_DIR}/openbao/init"
   local proxmox_file="${secret_dir}/proxmox.json"
   local traefik_file="${secret_dir}/traefik-dashboard.json"
-  local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
-  local management_ip=""
 
   install -d -m 0700 "$secret_dir" "$openbao_seal_dir" "$openbao_init_dir"
 
@@ -109,34 +107,6 @@ target.chmod(0o600)
 PY
   fi
 
-  if [[ ! -f "$velero_file" ]]; then
-    local seaweedfs_password=""
-    seaweedfs_password="$(openssl rand -hex 16)"
-    if ! management_ip="$(resolve_management_vm_ip)"; then
-      fail "Could not determine management VM IP"
-    fi
-    export MANAGEMENT_VM_IP="$management_ip"
-    python3 - "$velero_file" "$seaweedfs_password" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-target = pathlib.Path(sys.argv[1])
-management_ip = os.environ["MANAGEMENT_VM_IP"]
-payload = {
-    "mode": "seaweedfs",
-    "endpoint": f"http://{management_ip}:8333",
-    "bucket": "twinbox-velero",
-    "region": "seaweedfs",
-    "username": "velero",
-    "password": sys.argv[2],
-}
-target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-target.chmod(0o600)
-PY
-  fi
-
   if [[ ! -f "$seal_key_file" ]]; then
     openssl rand -hex 32 > "$seal_key_file"
     chmod 0600 "$seal_key_file"
@@ -146,11 +116,6 @@ PY
     openssl rand -hex 16 > "$seal_key_id_file"
     chmod 0600 "$seal_key_id_file"
   fi
-}
-
-ensure_seaweedfs_data_dir() {
-  install -d -m 0755 "$TARGET_DIR/seaweedfs/data"
-  sudo chown -R "$USER":"$USER" "$TARGET_DIR/seaweedfs/data"
 }
 
 log() {
@@ -189,8 +154,6 @@ if [[ ! -w "$TARGET_DIR" ]]; then
   log "Taking ownership of $TARGET_DIR for current user"
   sudo chown -R "$USER":"$USER" "$TARGET_DIR"
 fi
-
-ensure_seaweedfs_data_dir
 
 cd "$TARGET_DIR"
 

@@ -35,6 +35,7 @@ import {
 } from "./journey.js";
 import { normalizeLogEntries } from "./install-logs.js";
 import { getInputOptions } from "./input-options.js";
+import { isInputVisible, omitSensitiveAnswers } from "./input-visibility.js";
 import { getQuestionSteps } from "./question-flow.js";
 import {
   isMissingClusterError,
@@ -122,6 +123,7 @@ function buildPayloadInputs(step, stepAnswers = {}) {
   const payload = {};
 
   for (const input of step.inputs || []) {
+    if (!isInputVisible(input, stepAnswers)) continue;
     if (Object.prototype.hasOwnProperty.call(stepAnswers, input.id)) {
       payload[input.id] = stepAnswers[input.id];
     } else if (Object.prototype.hasOwnProperty.call(input, "default")) {
@@ -396,7 +398,8 @@ function InputField({ stepId, input, value, onChange }) {
       </label>
     );
   }
-  const inputType = input.type === "integer" ? "number" : "text";
+  const inputType =
+    input.type === "integer" ? "number" : input.type === "password" ? "password" : "text";
 
   const fieldClassName = isDnsDomainField
     ? "wizard-field wizard-field-compact wizard-field-dns"
@@ -1247,7 +1250,7 @@ function App() {
     const state = {
       selectedStepId,
       wizardPhase,
-      answers,
+      answers: omitSensitiveAnswers(catalog, answers),
       clusterId,
       clusterCreatedAt,
       clusterInstanceId,
@@ -1275,6 +1278,7 @@ function App() {
     selectedStepId,
     wizardPhase,
     answers,
+    catalog,
     clusterId,
     clusterCreatedAt,
     clusterInstanceId,
@@ -2082,7 +2086,7 @@ function App() {
     const snapshot = serializeUiState({
       selectedStepId,
       wizardPhase,
-      answers: answersRef.current,
+      answers: omitSensitiveAnswers(catalog, answersRef.current),
       clusterId: clusterIdRef.current,
       clusterCreatedAt: clusterCreatedAtRef.current,
       clusterInstanceId: clusterInstanceIdRef.current,
@@ -2410,7 +2414,9 @@ function App() {
       ? provisionVmIpValidation.ok && provisionPlacementValidation.ok
       : true;
   const questionInputsValid = currentStep
-    ? (currentStep.inputs || []).every((input) => hasRequiredValue(input, currentDraft[input.id]))
+    ? (currentStep.inputs || [])
+        .filter((input) => isInputVisible(input, currentDraft))
+        .every((input) => hasRequiredValue(input, currentDraft[input.id]))
     : false;
   const primaryActionDisabled =
     !provisionStepValid ||
@@ -3003,15 +3009,19 @@ function App() {
                   </>
                 ) : (
                   <div className="wizard-input-grid">
-                    {(currentStep?.inputs || []).map((input) => (
-                      <InputField
-                        key={input.id}
-                        stepId={currentStep.id}
-                        input={input}
-                        value={currentDraft[input.id]}
-                        onChange={(inputId, value) => updateAnswer(currentStep.id, inputId, value)}
-                      />
-                    ))}
+                    {(currentStep?.inputs || [])
+                      .filter((input) => isInputVisible(input, currentDraft))
+                      .map((input) => (
+                        <InputField
+                          key={input.id}
+                          stepId={currentStep.id}
+                          input={input}
+                          value={currentDraft[input.id]}
+                          onChange={(inputId, value) =>
+                            updateAnswer(currentStep.id, inputId, value)
+                          }
+                        />
+                      ))}
                     {(!currentStep?.inputs || currentStep.inputs.length === 0) && (
                       <p className="wizard-empty">
                         {isQuestionPhase

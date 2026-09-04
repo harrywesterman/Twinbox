@@ -156,14 +156,8 @@ ensure_bootstrap_material() {
   local openbao_init_dir="${BOOTSTRAP_DIR}/openbao/init"
   local proxmox_file="${secret_dir}/proxmox.json"
   local traefik_file="${secret_dir}/traefik-dashboard.json"
-  local velero_file="${secret_dir}/velero.json"
   local seal_key_file="${openbao_seal_dir}/current.key"
   local seal_key_id_file="${openbao_seal_dir}/current-key-id"
-  local management_ip=""
-  local username="${SEAWEEDFS_ACCESS_KEY_ID:-velero}"
-  local password="${SEAWEEDFS_SECRET_ACCESS_KEY:-}"
-  local bucket="${SEAWEEDFS_BUCKET:-twinbox-velero}"
-  local region="${SEAWEEDFS_REGION:-seaweedfs}"
 
   install -d -m 0700 "$secret_dir" "$openbao_seal_dir" "$openbao_init_dir"
 
@@ -208,56 +202,6 @@ target.chmod(0o600)
 PY
   fi
 
-  if [[ -f "$velero_file" ]]; then
-    local file_value=""
-
-    file_value="$(jq -r '.username // empty' "$velero_file" 2>/dev/null || printf '')"
-    [[ -n "$file_value" ]] && username="$file_value"
-
-    file_value="$(jq -r '.password // empty' "$velero_file" 2>/dev/null || printf '')"
-    [[ -n "$file_value" ]] && password="$file_value"
-
-    file_value="$(jq -r '.bucket // empty' "$velero_file" 2>/dev/null || printf '')"
-    [[ -n "$file_value" ]] && bucket="$file_value"
-
-    file_value="$(jq -r '.region // empty' "$velero_file" 2>/dev/null || printf '')"
-    [[ -n "$file_value" ]] && region="$file_value"
-  fi
-
-  if [[ -z "$password" ]]; then
-    password="$(openssl rand -hex 16)"
-  fi
-
-  if ! management_ip="$(resolve_management_vm_ip)"; then
-    fail "Could not determine management VM IP"
-  fi
-
-  export MANAGEMENT_VM_IP="$management_ip"
-  export SEAWEEDFS_ACCESS_KEY_ID="$username"
-  export SEAWEEDFS_SECRET_ACCESS_KEY="$password"
-  export SEAWEEDFS_BUCKET="$bucket"
-  export SEAWEEDFS_REGION="$region"
-
-  python3 - "$velero_file" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-target = pathlib.Path(sys.argv[1])
-management_ip = os.environ["MANAGEMENT_VM_IP"]
-payload = {
-    "mode": "seaweedfs",
-    "endpoint": f"http://{management_ip}:8333",
-    "bucket": os.environ["SEAWEEDFS_BUCKET"],
-    "region": os.environ["SEAWEEDFS_REGION"],
-    "username": os.environ["SEAWEEDFS_ACCESS_KEY_ID"],
-    "password": os.environ["SEAWEEDFS_SECRET_ACCESS_KEY"],
-}
-target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-target.chmod(0o600)
-PY
-
   if [[ ! -f "$seal_key_file" ]]; then
     openssl rand -hex 32 > "$seal_key_file"
     chmod 0600 "$seal_key_file"
@@ -266,48 +210,6 @@ PY
   if [[ ! -f "$seal_key_id_file" ]]; then
     openssl rand -hex 16 > "$seal_key_id_file"
     chmod 0600 "$seal_key_id_file"
-  fi
-}
-
-ensure_seaweedfs_bootstrap() {
-  local attempt=1
-  local attempts=60
-  local bucket_list=""
-
-  while [[ "$attempt" -le "$attempts" ]]; do
-    if docker exec twinbox-seaweedfs sh -lc 'printf "s3.config.show\n" | weed shell' >/dev/null 2>&1; then
-      break
-    fi
-
-    log "Waiting for SeaweedFS S3 shell to become ready"
-    sleep 5
-    attempt=$((attempt + 1))
-  done
-
-  if [[ "$attempt" -gt "$attempts" ]]; then
-    log "SeaweedFS S3 shell never became ready"
-    return 1
-  fi
-
-  log "Reconciling SeaweedFS IAM config for ${SEAWEEDFS_ACCESS_KEY_ID}"
-  docker exec twinbox-seaweedfs sh -lc \
-    "printf 's3.configure --user ${SEAWEEDFS_ACCESS_KEY_ID} --access_key ${SEAWEEDFS_ACCESS_KEY_ID} --secret_key ${SEAWEEDFS_SECRET_ACCESS_KEY} --buckets ${SEAWEEDFS_BUCKET} --actions Read,Write,List,Tagging,Admin --apply true\n' | weed shell" >/dev/null
-
-  bucket_list="$(
-    docker exec twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
-  )"
-  if ! grep -Eq "^[[:space:]]+${SEAWEEDFS_BUCKET}[[:space:]]" <<<"$bucket_list"; then
-    log "Creating SeaweedFS bucket ${SEAWEEDFS_BUCKET}"
-    docker exec twinbox-seaweedfs sh -lc \
-      "printf 's3.bucket.create -name ${SEAWEEDFS_BUCKET} -owner ${SEAWEEDFS_ACCESS_KEY_ID}\n' | weed shell" >/dev/null
-  fi
-
-  bucket_list="$(
-    docker exec twinbox-seaweedfs sh -lc 'printf "s3.bucket.list\n" | weed shell'
-  )"
-  if ! grep -Eq "^[[:space:]]+${SEAWEEDFS_BUCKET}[[:space:]]" <<<"$bucket_list"; then
-    log "SeaweedFS bucket ${SEAWEEDFS_BUCKET} was not created"
-    return 1
   fi
 }
 
@@ -383,8 +285,6 @@ runtime_services=(
   manager-api
   manager-worker
   manager-web
-  seaweedfs
-  seaweedfs-admin
   beszel
   beszel-agent
 )
@@ -416,7 +316,6 @@ docker compose up -d "${runtime_services[@]}"
 
 sudo "${BOOTSTRAP_DIR}/bin/configure-manager-api-firewall.sh"
 sudo "${BOOTSTRAP_DIR}/bin/sync-manager-api-node-allowlist.sh"
-ensure_seaweedfs_bootstrap
 
 if [[ "$BOOTSTRAP_ONCE" -eq 1 ]]; then
   install -d -m 0755 "$(dirname "$BOOTSTRAP_MARKER")"

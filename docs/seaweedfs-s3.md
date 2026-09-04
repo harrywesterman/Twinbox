@@ -1,76 +1,20 @@
 # SeaweedFS S3 Storage
 
-Twinbox uses [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for two separate S3-compatible storage roles:
+Twinbox uses SeaweedFS only in two explicitly separated roles:
 
-- A Management VM SeaweedFS container remains the default backup target for Velero, Longhorn, CloudNativePG, Talos etcd snapshots, and Management VM restic backups.
-- A Kubernetes SeaweedFS deployment is installed as the default app-media object store for applications such as Mastodon.
+- The Kubernetes SeaweedFS installation is the application-media store. It exposes `s3.<ZONE_NAME>` for media and `s3-admin.<ZONE_NAME>` for administration.
+- When an operator has no external S3 service, the backup-storage wizard can provision a dedicated SeaweedFS VM. That VM is outside the Management VM and provides the same cluster backup-S3 contract as an external provider.
 
-## Architecture
+The Management VM Docker Compose stack does not run SeaweedFS.
 
-SeaweedFS runs on the Management VM alongside the Twinbox manager stack.
-`scripts/start-manager.sh` keeps the SeaweedFS bootstrap idempotent by ensuring the Velero bucket and IAM config exist after the container comes up.
+## Backup S3
 
-### Backup Components
+`configure-backup-storage` requires either an external HTTPS S3 endpoint or a dedicated local SeaweedFS VM. The cluster-scoped profile assigns separate buckets to databases, Longhorn, Velero, Management VM backups, and PBS. Credentials, VM SSH keys, and private CA material remain under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/` and in OpenBao; wizard state contains only metadata and secret references.
 
-| Resource | Location | Purpose |
-|----------|----------|---------|
-| Docker Compose service | `docker-compose.yml` | Runs SeaweedFS as a single management-VM container |
-| Bootstrap secret | `/opt/twinbox/bootstrap/secrets/global/velero.json` | Stores the S3 credentials, bucket, region, and endpoint |
-| K8s Service | `gitops/platform/management-consoles/seaweedfs-service.yaml` | Exposes SeaweedFS ports inside the cluster |
-| K8s Endpoints | `gitops/platform/management-consoles/seaweedfs-endpoints.yaml` | Points the cluster service at the Management VM IP |
-| Traefik IngressRoutes | `gitops/platform/management-consoles/seaweedfs-*.yaml` | Publishes the legacy backup SeaweedFS web UIs through Traefik |
+The dedicated VM uses a persistent data disk, a runtime-validated LAN address, TLS from a Twinbox private CA, and a restricted S3 identity. It is registered as a NetBird management peer later in the existing NetBird phase. This mode is a local backup and does not protect against loss of the complete Proxmox environment.
 
-### App-Media Components
+## Application media
 
-| Resource | Location | Purpose |
-|----------|----------|---------|
-| Argo CD Application | `gitops/apps/seaweedfs-object-store.yaml` | Installs the upstream SeaweedFS Helm chart into Kubernetes |
-| Helm values | `gitops/values/seaweedfs-object-store.yaml` | Enables master, volume, filer, S3, and admin components with Longhorn PVCs |
-| Setup step | `categories/talos-cluster/steps/install-seaweedfs-object-store/` | Installs SeaweedFS and provisions app buckets/users |
-| Traefik IngressRoutes | `gitops/platform/seaweedfs-object-store/ingressroute.yaml` | Publishes `s3.__ZONE_NAME__` app media and `s3-admin.__ZONE_NAME__` admin UI |
-| App secret | `twinbox/apps/mastodon/s3` in OpenBao | Stores Mastodon-specific S3 credentials |
+The cluster-native installation remains GitOps-managed by `gitops/apps/seaweedfs-object-store.yaml` and `gitops/values/seaweedfs-object-store.yaml`. Application credentials are separate from backup credentials. Mastodon, for example, uses its own bucket and OpenBao secret through the in-cluster endpoint `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333`.
 
-## S3 Endpoint
-
-Velero targets the SeaweedFS S3 endpoint on the Management VM directly:
-
-```text
-http://<MANAGEMENT_VM_IP>:8333
-```
-
-The same credentials, bucket name, and endpoint are stored in `/opt/twinbox/bootstrap/secrets/global/velero.json` and mirrored into the Management VM runtime when the stack starts.
-
-## Web UIs
-
-SeaweedFS exposes two browser-facing interfaces through Traefik:
-
-- `seaweedfs.__ZONE_NAME__` for the filer/standard web UI
-- `seaweedfs-admin.__ZONE_NAME__` for the admin UI
-
-The SeaweedFS filer host serves `/cache` without Authentik for Mastodon media, and Traefik prefixes the request with the `mastodon` bucket before it reaches the S3 endpoint on port `8333`. The admin UI stays behind Authentik.
-
-## Velero Integration
-
-`install-velero-backup` configures Velero to use SeaweedFS by default and renders the Helm values from `velero.json`.
-
-The `velero.json` bootstrap secret now looks like this:
-
-```json
-{
-  "mode": "seaweedfs",
-  "endpoint": "http://192.168.1.50:8333",
-  "bucket": "twinbox-velero",
-  "region": "seaweedfs",
-  "username": "velero",
-  "password": "generated-password"
-}
-```
-
-## Notes
-
-- SeaweedFS is the only built-in S3 target.
-- Garage is no longer installed or referenced.
-- Velero always points at SeaweedFS unless the operator changes the generated bootstrap secret manually.
-- Longhorn, CloudNativePG, Velero, Talos etcd snapshots, and Management VM restic backups all use the same SeaweedFS S3 target by default.
-- Mastodon media uses the Kubernetes SeaweedFS endpoint `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333` and public media host `s3.__ZONE_NAME__`.
-- Management VM restic backups exclude `/opt/twinbox/seaweedfs/data` to avoid recursively backing up the backup store.
+Do not point backup consumers at the application-media installation, and do not point applications at the backup profile.
