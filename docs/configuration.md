@@ -305,6 +305,7 @@ Forgejo is exposed externally as `https://forgejo.<ZONE_NAME>` by the management
 - All downstream steps that talk to the Authentik API (`install-headlamp`, `install-twinbox-portal`, `install-dashy-dashboard`, `configure-argocd-oidc`, `install-pgadmin4`, `install-management-consoles`) source the bundled `scripts/manager/authentik-auth.sh` helper and call `authentik_ensure_token`. The helper reads the persistent `AUTHENTIK_API_TOKEN` from OpenBao and uses it for all API calls.
 - `install-velero-backup` installs Velero together with the SeaweedFS S3 target that runs on the Management VM, syncs `/opt/twinbox/bootstrap/secrets/global/velero.json` into OpenBao, and renders the Argo CD values inline from that bootstrap file. Velero creates a daily cluster backup with 30-day retention.
 - `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS. The `/opt/twinbox/seaweedfs/data` directory is excluded so the object store is not backed up into itself.
+- `install-seaweedfs-object-store` installs a separate Kubernetes SeaweedFS deployment for app media. Its S3 endpoint is `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333`, Mastodon uses bucket `mastodon`, and public media is served from `s3.<ZONE_NAME>`. The admin UI is published as `s3-admin.<ZONE_NAME>` and appears in Dashy.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
 ## Dynamic Domain Configuration

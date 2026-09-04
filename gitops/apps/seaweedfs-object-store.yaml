@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seaweedfs-object-store
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://seaweedfs.github.io/seaweedfs/helm
+      chart: seaweedfs
+      targetRevision: "4.45.0"
+      helm:
+        valueFiles:
+          - $values/gitops/values/seaweedfs-object-store.yaml
+    - repoURL: __REPO_URL__
+      targetRevision: __TARGET_REVISION__
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: seaweedfs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

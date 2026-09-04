@@ -16,8 +16,8 @@ spec:
           mastodon:
             local_domain: mastodon.__ZONE_NAME__
             s3:
-              hostname: seaweedfs.__ZONE_NAME__
-              alias_host: seaweedfs.__ZONE_NAME__
+              hostname: s3.__ZONE_NAME__
+              alias_host: s3.__ZONE_NAME__
             smtp:
               domain: mastodon.__ZONE_NAME__
               from_address: notifications@mastodon.__ZONE_NAME__

@@ -166,6 +166,7 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
                 "install-argocd",
                 "install-longhorn-storage",
                 "install-secret-sync",
+                "install-seaweedfs-object-store",
                 "install-crowdsec",
                 "install-traefik",
                 "install-cloudnativepg",
@@ -189,6 +190,10 @@ def test_catalog_endpoint_returns_manifest_categories_and_steps():
             assert (
                 talos_steps["install-secret-sync"]["title"]
                 == "Install OpenBao and sync bootstrap secrets"
+            )
+            assert (
+                talos_steps["install-seaweedfs-object-store"]["title"]
+                == "Install SeaweedFS object store"
             )
             assert talos_steps["install-crowdsec"]["title"] == "Install CrowdSec"
             assert talos_steps["install-traefik"]["title"] == "Install Traefik"
@@ -301,6 +306,7 @@ def test_apps_catalog_exposes_audiobookshelf_as_installable():
             "install-longhorn-storage",
             "install-cloudnativepg",
             "install-secret-sync",
+            "install-seaweedfs-object-store",
             "install-authentik-idp",
             "create-users-and-groups",
             "choose-ingress-route",

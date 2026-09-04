@@ -44,6 +44,13 @@ export const STEP_ICON_MANIFEST = [
     officialSourceUrl: "https://github.com/openbao/openbao",
   }),
   iconEntry({
+    stepId: "install-seaweedfs-object-store",
+    fileBase: "install-management-consoles",
+    isAppOrPlatform: true,
+    officialSourceType: "project-repository",
+    officialSourceUrl: "https://github.com/seaweedfs/seaweedfs",
+  }),
+  iconEntry({
     stepId: "install-traefik",
     isAppOrPlatform: true,
     officialSourceType: "project-repository",

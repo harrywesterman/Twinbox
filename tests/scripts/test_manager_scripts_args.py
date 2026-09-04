@@ -138,6 +138,30 @@ MANAGEMENT_IP_HELPER = REPO_ROOT / "scripts" / "manager" / "management-ip.sh"
 LONGHORN_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-longhorn-storage" / "run.sh"
 )
+SEAWEEDFS_OBJECT_STORE_STEP_SCRIPT = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-seaweedfs-object-store"
+    / "run.sh"
+)
+SEAWEEDFS_OBJECT_STORE_STEP_MANIFEST = (
+    REPO_ROOT
+    / "categories"
+    / "talos-cluster"
+    / "steps"
+    / "install-seaweedfs-object-store"
+    / "step.yaml"
+)
+SEAWEEDFS_OBJECT_STORE_APP = REPO_ROOT / "gitops" / "apps" / "seaweedfs-object-store.yaml"
+SEAWEEDFS_OBJECT_STORE_VALUES = REPO_ROOT / "gitops" / "values" / "seaweedfs-object-store.yaml"
+SEAWEEDFS_OBJECT_STORE_INGRESSROUTE = (
+    REPO_ROOT / "gitops" / "platform" / "seaweedfs-object-store" / "ingressroute.yaml"
+)
+SEAWEEDFS_OBJECT_STORE_NAMESPACE = (
+    REPO_ROOT / "gitops" / "platform" / "seaweedfs-object-store" / "namespace.yaml"
+)
 CLOUDNATIVEPG_STEP_SCRIPT = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-cloudnativepg" / "run.sh"
 )
@@ -1032,6 +1056,104 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     assert setup_step_ids.index('"install-twinbox-agents"') < setup_step_ids.index(
         '"install-management-consoles"'
     )
+
+
+def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
+    journey_text = MANAGER_WEB_JOURNEY.read_text(encoding="utf-8")
+    setup_step_ids = journey_text.split("const FIXED_SETUP_STEP_IDS = [", 1)[1].split(
+        "];",
+        1,
+    )[0]
+    step_text = SEAWEEDFS_OBJECT_STORE_STEP_SCRIPT.read_text(encoding="utf-8")
+    step_manifest_text = SEAWEEDFS_OBJECT_STORE_STEP_MANIFEST.read_text(encoding="utf-8")
+    app_text = SEAWEEDFS_OBJECT_STORE_APP.read_text(encoding="utf-8")
+    values_text = SEAWEEDFS_OBJECT_STORE_VALUES.read_text(encoding="utf-8")
+    namespace_text = SEAWEEDFS_OBJECT_STORE_NAMESPACE.read_text(encoding="utf-8")
+
+    assert '"install-secret-sync"' in setup_step_ids
+    assert '"install-seaweedfs-object-store"' in setup_step_ids
+    assert setup_step_ids.index('"install-secret-sync"') < setup_step_ids.index(
+        '"install-seaweedfs-object-store"'
+    )
+    assert setup_step_ids.index('"install-seaweedfs-object-store"') < setup_step_ids.index(
+        '"install-crowdsec"'
+    )
+    assert "id: install-seaweedfs-object-store" in step_manifest_text
+    assert "Install SeaweedFS object store" in step_manifest_text
+    assert "depends_on:" in step_manifest_text
+    assert "- install-longhorn-storage" in step_manifest_text
+    assert "- install-secret-sync" in step_manifest_text
+    assert "s3-admin.__ZONE_NAME__" in step_manifest_text
+
+    assert "repoURL: https://seaweedfs.github.io/seaweedfs/helm" in app_text
+    assert "chart: seaweedfs" in app_text
+    assert 'targetRevision: "4.45.0"' in app_text
+    assert "namespace: seaweedfs" in app_text
+    assert "name: seaweedfs" in namespace_text
+    assert "master:" in values_text and "enabled: true" in values_text
+    assert "volume:" in values_text and "filer:" in values_text and "s3:" in values_text
+    assert "admin:" in values_text
+    assert "storageClass: longhorn" in values_text
+    assert "twinbox.io/role: worker" in values_text
+    assert "allInOne:" in values_text and "enabled: false" in values_text
+
+    assert "SEAWEEDFS_APP_S3_ENDPOINT" in step_text
+    assert "http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333" in step_text
+    assert 'openbao_read_secret_json "$SEAWEEDFS_MASTODON_SECRET_PATH"' in step_text
+    assert (
+        'SEAWEEDFS_MASTODON_SECRET_PATH="${SEAWEEDFS_MASTODON_SECRET_PATH:-twinbox/apps/mastodon/s3}"'
+        in step_text
+    )
+    assert 'openbao_sync_secret_file "$SEAWEEDFS_MASTODON_SECRET_PATH"' in step_text
+    assert "s3.configure --user ${SEAWEEDFS_MASTODON_USERNAME}" in step_text
+    assert (
+        "s3.bucket.create -name ${SEAWEEDFS_MASTODON_BUCKET} -owner ${SEAWEEDFS_MASTODON_USERNAME}"
+        in step_text
+    )
+    assert "twinbox/global/velero" not in step_text
+
+
+def test_seaweedfs_object_store_routes_use_s3_hosts_without_replacing_backup_routes():
+    platform_ingress_text = (REPO_ROOT / "gitops" / "apps" / "platform-ingress.yaml").read_text(
+        encoding="utf-8"
+    )
+    route_text = SEAWEEDFS_OBJECT_STORE_INGRESSROUTE.read_text(encoding="utf-8")
+    mastodon_app_text = MASTODON_APP.read_text(encoding="utf-8")
+    mastodon_values_text = MASTODON_VALUES.read_text(encoding="utf-8")
+    mastodon_s3_secret_text = MASTODON_S3_SECRET.read_text(encoding="utf-8")
+
+    assert "Host(`s3.__ZONE_NAME__`)" in route_text
+    assert "Host(`s3-admin.__ZONE_NAME__`)" in route_text
+    assert "name: seaweedfs-cache-prefix" in route_text
+    assert "prefix: /buckets/mastodon" in route_text
+    assert "name: authentik-forwardauth" in route_text
+    assert "name: seaweedfs-filer" in route_text
+    assert "port: 8888" in route_text
+    assert "name: seaweedfs-admin" in route_text
+    assert "port: 23646" in route_text
+
+    assert (
+        's3.{{index .metadata.annotations "twinbox.io/public-zone-name"}}' in platform_ingress_text
+    )
+    assert (
+        's3-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_text
+    )
+    assert (
+        'seaweedfs.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_text
+    )
+    assert (
+        'seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
+        in platform_ingress_text
+    )
+
+    assert "hostname: s3.__ZONE_NAME__" in mastodon_app_text
+    assert "alias_host: s3.__ZONE_NAME__" in mastodon_app_text
+    assert "endpoint: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333" in mastodon_values_text
+    assert "bucket: mastodon" in mastodon_values_text
+    assert "key: twinbox/apps/mastodon/s3" in mastodon_s3_secret_text
+    assert "key: twinbox/global/velero" not in mastodon_s3_secret_text
 
 
 def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
@@ -4917,6 +5039,8 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
 
     assert "title: Install Mastodon" in step_manifest_text
     assert "icon: install-mastodon" in step_manifest_text
+    assert "depends_on:" in step_manifest_text
+    assert "- install-seaweedfs-object-store" in step_manifest_text
     assert "categories/apps/steps/install-mastodon/run.sh" in step_manifest_text
 
     generate_alphanumeric_text = step_text.split("generate_alphanumeric() {", 1)[1].split(
@@ -5001,7 +5125,8 @@ def test_mastodon_step_applies_the_custom_app_and_bootstraps_admin_access():
     assert "property: ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY" in runtime_secret_text
     assert "property: ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT" in runtime_secret_text
     assert "name: mastodon-s3" in s3_secret_text
-    assert "key: twinbox/global/velero" in s3_secret_text
+    assert "key: twinbox/apps/mastodon/s3" in s3_secret_text
+    assert "key: twinbox/global/velero" not in s3_secret_text
     assert "name: mastodon-db-credentials" in db_secret_text
     assert "property: MASTODON_POSTGRESQL__USERNAME" in db_secret_text
     assert "property: MASTODON_POSTGRESQL__PASSWORD" in db_secret_text

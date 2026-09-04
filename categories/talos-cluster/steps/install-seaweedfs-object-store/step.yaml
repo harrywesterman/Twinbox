@@ -1,0 +1,28 @@
+id: install-seaweedfs-object-store
+title: Install SeaweedFS object store
+type: action
+journey_stage: setup
+summary: Install the Kubernetes SeaweedFS object store for app media.
+explanation: Twinbox deploys a cluster-native SeaweedFS S3 target for application media while leaving the existing backup object store unchanged.
+side_help: SeaweedFS provides an S3-compatible object store for app uploads such as Mastodon media.
+depends_on:
+  - install-longhorn-storage
+  - install-secret-sync
+dashy:
+  items:
+    - section: Platform
+      title: SeaweedFS App S3 Admin
+      description: App media object storage
+      icon: fas fa-box-archive
+      url_template: https://s3-admin.__ZONE_NAME__
+inputs: []
+secrets:
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-seaweedfs-object-store/run.sh

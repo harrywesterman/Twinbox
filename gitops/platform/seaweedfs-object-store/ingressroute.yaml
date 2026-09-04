@@ -1,0 +1,119 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: seaweedfs-cache-prefix
+  namespace: seaweedfs
+spec:
+  addPrefix:
+    prefix: /buckets/mastodon
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-media
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`s3.__ZONE_NAME__`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
+      middlewares:
+        - name: seaweedfs-cache-prefix
+      services:
+        - kind: Service
+          name: seaweedfs-filer
+          port: 8888
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-media-netbird
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`s3.__ZONE_NAME__`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
+      middlewares:
+        - name: seaweedfs-cache-prefix
+      services:
+        - kind: Service
+          name: seaweedfs-filer
+          port: 8888
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-admin
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`s3-admin.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
+          namespace: longhorn-system
+      services:
+        - kind: Service
+          name: seaweedfs-admin
+          port: 23646
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-admin-netbird
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`s3-admin.__ZONE_NAME__`)
+      middlewares:
+        - name: authentik-forwardauth
+          namespace: longhorn-system
+      services:
+        - kind: Service
+          name: seaweedfs-admin
+          port: 23646
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-admin-authentik-callback
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`s3-admin.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      services:
+        - kind: Service
+          name: authentik-server
+          namespace: authentik
+          port: 80
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seaweedfs-app-admin-authentik-callback-netbird
+  namespace: seaweedfs
+spec:
+  entryPoints:
+    - webnetbird
+  routes:
+    - kind: Rule
+      match: Host(`s3-admin.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+      services:
+        - kind: Service
+          name: authentik-server
+          namespace: authentik
+          port: 80

@@ -1,0 +1,78 @@
+global:
+  seaweedfs:
+    loggingLevel: 1
+
+master:
+  enabled: true
+  replicas: 1
+  nodeSelector: |
+    twinbox.io/role: worker
+  data:
+    type: persistentVolumeClaim
+    size: 5Gi
+    storageClass: longhorn
+  logs:
+    type: emptyDir
+
+volume:
+  enabled: true
+  replicas: 1
+  nodeSelector: |
+    twinbox.io/role: worker
+  dataDirs:
+    - name: data
+      type: persistentVolumeClaim
+      size: 100Gi
+      storageClass: longhorn
+      maxVolumes: 0
+  idx:
+    type: persistentVolumeClaim
+    size: 10Gi
+    storageClass: longhorn
+  logs:
+    type: emptyDir
+
+filer:
+  enabled: true
+  replicas: 1
+  nodeSelector: |
+    twinbox.io/role: worker
+  data:
+    type: persistentVolumeClaim
+    size: 20Gi
+    storageClass: longhorn
+  logs:
+    type: emptyDir
+
+s3:
+  enabled: true
+  replicas: 1
+  port: 8333
+  lancePort: 0
+  nodeSelector: |
+    twinbox.io/role: worker
+  logs:
+    type: emptyDir
+  service:
+    type: ClusterIP
+
+admin:
+  enabled: true
+  replicas: 1
+  nodeSelector: |
+    twinbox.io/role: worker
+  data:
+    type: emptyDir
+  logs:
+    type: emptyDir
+  service:
+    type: ClusterIP
+
+allInOne:
+  enabled: false
+
+sftp:
+  enabled: false
+
+worker:
+  enabled: false

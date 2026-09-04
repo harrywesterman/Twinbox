@@ -672,13 +672,13 @@ openbao_wait_for_local_forward() {
   openbao_fail "OpenBao port-forward on 127.0.0.1:${forward_port} did not become ready"
 }
 
-openbao_sync_global_secret_file() {
-  local secret_name="$1"
+openbao_sync_secret_file() {
+  local secret_path="$1"
   local json_file="$2"
   shift 2
   local required_keys=("$@")
 
-  [[ -n "$secret_name" ]] || openbao_fail "secret name is required"
+  [[ -n "$secret_path" ]] || openbao_fail "secret path is required"
   [[ -f "$json_file" ]] || openbao_fail "JSON secret file not found: ${json_file}"
   [[ -n "${KUBECONFIG_FILE:-}" ]] || openbao_fail "KUBECONFIG_FILE is required"
   [[ -f "${KUBECONFIG_FILE:-}" ]] || openbao_fail "kubeconfig not found at ${KUBECONFIG_FILE:-}"
@@ -730,14 +730,23 @@ openbao_sync_global_secret_file() {
     -H "Content-Type: application/json" \
     -H "X-Vault-Token: ${root_token}" \
     --data-binary "$payload" \
-    "http://127.0.0.1:${forward_port}/v1/kv/data/twinbox/global/${secret_name}" >/dev/null
+    "http://127.0.0.1:${forward_port}/v1/kv/data/${secret_path}" >/dev/null
 
-  openbao_log "Synced OpenBao secret twinbox/global/${secret_name} from ${json_file}"
+  openbao_log "Synced OpenBao secret ${secret_path} from ${json_file}"
 }
 
-openbao_read_global_secret_json() {
+openbao_sync_global_secret_file() {
   local secret_name="$1"
+  local json_file="$2"
+  shift 2
+
   [[ -n "$secret_name" ]] || openbao_fail "secret name is required"
+  openbao_sync_secret_file "twinbox/global/${secret_name}" "$json_file" "$@"
+}
+
+openbao_read_secret_json() {
+  local secret_path="$1"
+  [[ -n "$secret_path" ]] || openbao_fail "secret path is required"
   [[ -f "$OPENBAO_ROOT_TOKEN_FILE" ]] || openbao_fail "OpenBao root token file not found: ${OPENBAO_ROOT_TOKEN_FILE}"
 
   [[ -n "${KUBECONFIG_FILE:-}" ]] || openbao_fail "KUBECONFIG_FILE is required"
@@ -782,8 +791,14 @@ openbao_read_global_secret_json() {
   curl -fsS \
     -H "Accept: application/json" \
     -H "X-Vault-Token: ${root_token}" \
-    "http://127.0.0.1:${forward_port}/v1/kv/data/twinbox/global/${secret_name}" \
+    "http://127.0.0.1:${forward_port}/v1/kv/data/${secret_path}" \
     | jq -c '.data.data'
+}
+
+openbao_read_global_secret_json() {
+  local secret_name="$1"
+  [[ -n "$secret_name" ]] || openbao_fail "secret name is required"
+  openbao_read_secret_json "twinbox/global/${secret_name}"
 }
 
 openbao_read_global_secret_field() {

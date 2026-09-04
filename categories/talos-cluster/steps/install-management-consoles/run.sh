@@ -939,6 +939,13 @@ management_apps_json="$(
         slug: "seaweedfs-admin",
         external_host: "https://seaweedfs-admin.\($public_zone_name)",
         launch_url: "https://seaweedfs-admin.\($public_zone_name)"
+      },
+      {
+        key: "seaweedfs_app_admin",
+        name: "SeaweedFS App S3 Admin",
+        slug: "s3-admin",
+        external_host: "https://s3-admin.\($public_zone_name)",
+        launch_url: "https://s3-admin.\($public_zone_name)"
       }
     ]'
 )"
@@ -1011,6 +1018,7 @@ proxmox_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.proxmox')"
 webwizard_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.webwizard')"
 seaweedfs_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs')"
 seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_admin')"
+seaweedfs_app_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seaweedfs_app_admin')"
 
 [[ "$traefik_provider_id" != "null" && -n "$traefik_provider_id" ]] || fail "Could not determine Traefik provider ID"
 [[ "$longhorn_provider_id" != "null" && -n "$longhorn_provider_id" ]] || fail "Could not determine Longhorn provider ID"
@@ -1019,6 +1027,7 @@ seaweedfs_admin_provider_id="$(printf '%s' "$provider_ids_json" | jq -r '.seawee
 [[ "$webwizard_provider_id" != "null" && -n "$webwizard_provider_id" ]] || fail "Could not determine Web Wizard provider ID"
 [[ "$seaweedfs_provider_id" != "null" && -n "$seaweedfs_provider_id" ]] || fail "Could not determine SeaweedFS provider ID"
 [[ "$seaweedfs_admin_provider_id" != "null" && -n "$seaweedfs_admin_provider_id" ]] || fail "Could not determine SeaweedFS admin provider ID"
+[[ "$seaweedfs_app_admin_provider_id" != "null" && -n "$seaweedfs_app_admin_provider_id" ]] || fail "Could not determine SeaweedFS app S3 admin provider ID"
 
 set_context "authentik Embedded Outpost" "" "outpost" "lookup" "/outposts/instances/?page_size=100"
 authentik_get_json_context outpost_json "/outposts/instances/?page_size=100" "authentik Embedded Outpost" "" "outpost" "lookup"
@@ -1030,11 +1039,11 @@ forgejo_legacy_proxy_provider_id="$(find_proxy_provider_pk_by_name "$forgejo_pro
 log "Embedded Authentik outpost currently has $(jq -r 'length' <<<"$current_providers") proxy provider(s)"
 updated_providers="$(
   printf '%s\n' "$current_providers" \
-    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg webwizard "$webwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" --arg forgejo_legacy "$forgejo_legacy_proxy_provider_id" '
+    | jq --arg traefik "$traefik_provider_id" --arg longhorn "$longhorn_provider_id" --arg hubble "$hubble_provider_id" --arg proxmox "$proxmox_provider_id" --arg webwizard "$webwizard_provider_id" --arg seaweedfs "$seaweedfs_provider_id" --arg seaweedfs_admin "$seaweedfs_admin_provider_id" --arg seaweedfs_app_admin "$seaweedfs_app_admin_provider_id" --arg forgejo_legacy "$forgejo_legacy_proxy_provider_id" '
         map(tostring)
         | map(select($forgejo_legacy == "" or . != $forgejo_legacy))
         | . + [$traefik, $longhorn, $hubble, $proxmox, $webwizard]
-        + [$seaweedfs, $seaweedfs_admin]
+        + [$seaweedfs, $seaweedfs_admin, $seaweedfs_app_admin]
         | unique
       '
 )"
@@ -1092,6 +1101,7 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg forgejo_route "forgejo" \
     --arg seaweedfs_route "seaweedfs" \
     --arg seaweedfs_admin_route "seaweedfs-admin" \
+    --arg seaweedfs_app_admin_route "s3-admin" \
     '{
       traefik_route: $traefik_route,
       longhorn_route: $longhorn_route,
@@ -1100,7 +1110,8 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
       webwizard_route: $webwizard_route,
       forgejo_route: $forgejo_route,
       seaweedfs_route: $seaweedfs_route,
-      seaweedfs_admin_route: $seaweedfs_admin_route
+      seaweedfs_admin_route: $seaweedfs_admin_route,
+      seaweedfs_app_admin_route: $seaweedfs_app_admin_route
     }' >"$STEP_RESULT_FILE"
 fi
 
@@ -1136,6 +1147,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "seaweedfs-admin" \
   --service-domain "seaweedfs-admin.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
+  --service-path /
+
+bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
+  --service-name "s3-admin" \
+  --service-domain "s3-admin.$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")" \
   --service-path /
 
 bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \

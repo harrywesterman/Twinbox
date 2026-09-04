@@ -12,6 +12,8 @@ dashy:
       description: Federated social publishing
       icon: install-mastodon
       url_template: https://mastodon.__ZONE_NAME__
+depends_on:
+  - install-seaweedfs-object-store
 inputs: []
 secrets:
   files:

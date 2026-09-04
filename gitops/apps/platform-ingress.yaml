@@ -243,6 +243,48 @@ spec:
                   value: Host(`seaweedfs-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
             - target:
                 kind: IngressRoute
+                name: seaweedfs-app-media
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-app-media-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && (PathPrefix(`/accounts`) || PathPrefix(`/cache`) || PathPrefix(`/custom_emojis`) || PathPrefix(`/media_attachments`) || PathPrefix(`/preview_cards`) || PathPrefix(`/site_uploads`))
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-app-admin
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-app-admin-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-app-admin-authentik-callback
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
+                name: seaweedfs-app-admin-authentik-callback-netbird
+              patch: |-
+                - op: replace
+                  path: /spec/routes/0/match
+                  value: Host(`s3-admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`) && PathPrefix(`/outpost.goauthentik.io`)
+            - target:
+                kind: IngressRoute
                 name: proxmox
               patch: |-
                 - op: replace

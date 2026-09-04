@@ -56,6 +56,11 @@ function buildCatalog(stepStatuses = {}) {
       "Install OpenBao and sync bootstrap secrets",
       { dependsOn: ["install-longhorn-storage"] },
     ],
+    [
+      "install-seaweedfs-object-store",
+      "Install SeaweedFS object store",
+      { dependsOn: ["install-longhorn-storage", "install-secret-sync"] },
+    ],
     ["install-crowdsec", "Install CrowdSec", { dependsOn: ["install-secret-sync"] }],
     ["install-traefik", "Install Traefik", { dependsOn: ["install-crowdsec"] }],
     [
@@ -201,7 +206,7 @@ function buildCatalog(stepStatuses = {}) {
         ],
       },
     ],
-    ["install-mastodon", "Install Mastodon", { dependsOn: [] }],
+    ["install-mastodon", "Install Mastodon", { dependsOn: ["install-seaweedfs-object-store"] }],
     ["install-zulip", "Install Zulip", { dependsOn: [] }],
     ["install-paperless", "Install Paperless", { dependsOn: [] }],
     [
@@ -304,7 +309,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   });
 
   assert.equal(model.mode, "setup");
-  assert.equal(model.stepRail.length, 25);
+  assert.equal(model.stepRail.length, 26);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById["provision-nodes"].title, "Deploy Talos Cluster");
   assert.equal(stepRailById["provision-nodes"].isCurrent, true);
@@ -332,7 +337,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   assert.equal(stepRailById["install-velero-ui"].title, "Install Velero UI");
   assert.equal(stepRailById["install-velero-ui"].icon, "🖥️");
   assert.equal(model.primaryAction.label, "Next");
-  assert.equal(model.progress.totalSteps, 25);
+  assert.equal(model.progress.totalSteps, 26);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, "Applying cluster plan");
   assert.equal(
@@ -429,6 +434,7 @@ test("wizard model switches to manage mode when setup flow is complete", () => {
         "install-argocd",
         "install-longhorn-storage",
         "install-secret-sync",
+        "install-seaweedfs-object-store",
         "install-crowdsec",
         "install-traefik",
         "install-cloudnativepg",
@@ -494,13 +500,14 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     selectedStepId: "",
   });
 
-  assert.equal(model.stepRail.length, 25);
+  assert.equal(model.stepRail.length, 26);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     "provision-nodes",
     "install-argocd",
     "install-longhorn-storage",
     "install-secret-sync",
+    "install-seaweedfs-object-store",
     "install-crowdsec",
     "install-traefik",
     "install-cloudnativepg",

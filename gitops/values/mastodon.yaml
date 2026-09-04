@@ -20,7 +20,7 @@ mastodon:
     enabled: true
     existingSecret: mastodon-s3
     bucket: mastodon
-    endpoint: http://seaweedfs.longhorn-system.svc.cluster.local:8333
+    endpoint: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
     protocol: https
     region: seaweedfs
     permission: public-read

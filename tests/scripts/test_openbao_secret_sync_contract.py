@@ -136,14 +136,18 @@ def test_sync_openbao_global_secret_script_uses_port_forward_and_kv_v2_api():
 
 def test_openbao_global_secret_reads_use_active_service_port_forward():
     text = _read(OPENBAO_HELPER)
-    read_function = text.split("openbao_read_global_secret_json() {", 1)[1].split(
+    read_function = text.split("openbao_read_secret_json() {", 1)[1].split(
+        "openbao_read_global_secret_json() {", 1
+    )[0]
+    global_read_function = text.split("openbao_read_global_secret_json() {", 1)[1].split(
         "openbao_read_global_secret_field() {", 1
     )[0]
 
     assert 'kubectl -n "$OPENBAO_NAMESPACE" port-forward "svc/openbao-active"' in read_function
-    assert "/v1/kv/data/twinbox/global/${secret_name}" in read_function
+    assert "/v1/kv/data/${secret_path}" in read_function
     assert "openbao_wait_for_server_pod" not in read_function
     assert "bao kv get" not in read_function
+    assert 'openbao_read_secret_json "twinbox/global/${secret_name}"' in global_read_function
 
 
 def test_openbao_kubernetes_auth_uses_external_secrets_client_jwt_reviewer():

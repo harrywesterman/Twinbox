@@ -19,12 +19,17 @@ function loadStep(stepId) {
 }
 
 test("real step manifests normalize Dashy metadata", () => {
-  const step = loadStep("install-management-consoles");
+  const managementStep = loadStep("install-management-consoles");
+  const seaweedfsStep = loadStep("install-seaweedfs-object-store");
 
-  assert.equal(step.dashy.items.length, 5);
+  assert.equal(managementStep.dashy.items.length, 5);
   assert.deepEqual(
-    step.dashy.items.map((item) => item.title),
+    managementStep.dashy.items.map((item) => item.title),
     ["Proxmox", "SeaweedFS", "SeaweedFS Admin", "Web Wizard", "Forgejo"]
+  );
+  assert.deepEqual(
+    seaweedfsStep.dashy.items.map((item) => item.title),
+    ["SeaweedFS App S3 Admin"]
   );
 });
 
@@ -36,6 +41,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     loadStep("install-grafana"),
     loadStep("install-prometheus"),
     loadStep("install-loki"),
+    loadStep("install-seaweedfs-object-store"),
     loadStep("install-management-consoles"),
     loadStep("install-pgadmin4"),
     loadStep("install-twinbox-portal"),
@@ -51,6 +57,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     ["install-grafana", { status: "succeeded", outputs: {} }],
     ["install-prometheus", { status: "succeeded", outputs: {} }],
     ["install-loki", { status: "succeeded", outputs: {} }],
+    ["install-seaweedfs-object-store", { status: "succeeded", outputs: {} }],
     ["install-management-consoles", { status: "succeeded", outputs: {} }],
     ["install-pgadmin4", { status: "succeeded", outputs: {} }],
     ["install-twinbox-portal", { status: "succeeded", outputs: {} }],
@@ -108,6 +115,12 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   );
   assert(
     platformSection.items.some(
+      (item) =>
+        item.title === "SeaweedFS App S3 Admin" && item.url === "https://s3-admin.tst.example.com"
+    )
+  );
+  assert(
+    platformSection.items.some(
       (item) => item.title === "Twinbox Portal" && item.url === "https://portal.tst.example.com"
     )
   );
@@ -150,6 +163,7 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Proxmox",
     "SeaweedFS",
     "SeaweedFS Admin",
+    "SeaweedFS App S3 Admin",
     "Web Wizard",
     "Twinbox Portal",
     "Velero UI",

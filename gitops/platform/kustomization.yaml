@@ -40,5 +40,7 @@ resources:
   - management-consoles/seaweedfs-ingressroute.yaml
   - management-consoles/seaweedfs-admin-ingressroute.yaml
   - management-consoles/seaweedfs-service.yaml
+  - seaweedfs-object-store/namespace.yaml
+  - seaweedfs-object-store/ingressroute.yaml
   - management-consoles/beszel-ingressroute.yaml
   - management-consoles/beszel-service.yaml

@@ -22,29 +22,30 @@ Talos lifecycle operations are triggered through the manager stack.
 16. The worker waits for `cilium`, `cilium-operator`, `coredns`, `hubble-relay`, and `hubble-ui` to become healthy and verifies that `kube-proxy` is not deployed.
 17. `install-argocd` installs Argo CD after the cluster networking layer is already available.
 18. `install-longhorn-storage` applies the Longhorn Argo CD application, makes `StorageClass/longhorn` the default, configures SeaweedFS as the default Longhorn backup target, and installs recurring snapshot/backup jobs for new Longhorn PVCs. Longhorn is configured to run on worker nodes only, so its managers, UI, and CSI components stay off control planes. Twinbox also sets Longhorn's drain policy for maintenance-friendly Talos upgrades on the fixed worker pool.
-19. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
-20. `install-loki` installs Loki so Grafana can query cluster logs.
-21. `install-tempo` installs Tempo so Grafana can query traces.
-22. `install-alloy` installs Grafana Alloy as the shared collection pipeline for logs, events, and traces.
-23. `install-grafana` installs Grafana, provisions Prometheus, Loki, and Tempo datasources, and seeds the default observability dashboards.
-24. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
-25. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
-26. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
-27. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
-28. `install-traefik` installs the Traefik ingress controller through Argo CD.
-29. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for daily cluster backups.
-30. `install-velero-ui` deploys the Velero UI dashboard on top of the Velero install and gates access through Authentik.
-31. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
-32. `install-crowdsec` deploys CrowdSec security engine and seeds the Traefik bouncer key into OpenBao.
-33. `install-ntfy` deploys the ntfy push notification service for cluster alerts.
-34. `install-browser-ssh` deploys Termix browser SSH access and creates the opkssh Authentik OAuth2 application. `install-opkssh` installs opkssh on the Management VM and bastion so admins authenticate with Authentik + MFA.
-35. `install-headlamp` deploys the Kubernetes dashboard with native Authentik OIDC login.
-36. `install-twinbox-portal` renders the user portal config from step metadata and cluster state, writing it to `Secret/portal-config`.
-37. `install-dashy-dashboard` renders the legacy admin launcher config into `ConfigMap/dashy-config`.
-38. `install-management-consoles` publishes Proxmox, Longhorn, Forgejo, and SeaweedFS web UIs behind Traefik. Forgejo uses native Authentik/OIDC login; the other management consoles use Authentik proxy protection.
-39. `install-pgadmin4` deploys pgAdmin 4 with Longhorn-backed persistence and Authentik OIDC.
-40. `configure-argocd-oidc` configures Argo CD to use Authentik for SSO.
-41. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Cloudflare, and user applications.
+19. `install-seaweedfs-object-store` deploys the Kubernetes SeaweedFS app-media object store, creates the Mastodon bucket/user, and syncs the app-specific S3 credentials into OpenBao.
+20. `install-prometheus` installs the kube-prometheus-stack through Argo CD, enabling Prometheus, Alertmanager, node-exporter, and kube-state-metrics on Longhorn-backed storage.
+21. `install-loki` installs Loki so Grafana can query cluster logs.
+22. `install-tempo` installs Tempo so Grafana can query traces.
+23. `install-alloy` installs Grafana Alloy as the shared collection pipeline for logs, events, and traces.
+24. `install-grafana` installs Grafana, provisions Prometheus, Loki, and Tempo datasources, and seeds the default observability dashboards.
+25. `install-secret-sync` installs External Secrets Operator and OpenBao, seeds OpenBao from management-local bootstrap JSON, and creates `Secret/proxmox-bootstrap`.
+26. `install-cloudnativepg` installs the CloudNativePG operator on top of Longhorn so PostgreSQL-backed workloads can share one database platform.
+27. `install-authentik-idp` provisions the PostgreSQL cluster for Authentik, installs Authentik, seeds the Authentik bootstrap secret into OpenBao, and deletes the temporary local seed file after sync.
+28. `create-users-and-groups` creates the first Authentik user, creates the `admins` group, and adds the user to that group using the Authentik bootstrap secret from OpenBao and the Management VM login password stored under `/opt/twinbox/bootstrap/secrets/global/twinbox-login.json`.
+29. `install-traefik` installs the Traefik ingress controller through Argo CD.
+30. `install-velero-backup` deploys Velero and points it at the SeaweedFS S3 target running on the Management VM as the default backup storage location for daily cluster backups.
+31. `install-velero-ui` deploys the Velero UI dashboard on top of the Velero install and gates access through Authentik.
+32. `install-management-backup` installs host cron jobs on the Management VM for daily Talos etcd snapshots and daily `/opt/twinbox` restic backups to SeaweedFS.
+33. `install-crowdsec` deploys CrowdSec security engine and seeds the Traefik bouncer key into OpenBao.
+34. `install-ntfy` deploys the ntfy push notification service for cluster alerts.
+35. `install-browser-ssh` deploys Termix browser SSH access and creates the opkssh Authentik OAuth2 application. `install-opkssh` installs opkssh on the Management VM and bastion so admins authenticate with Authentik + MFA.
+36. `install-headlamp` deploys the Kubernetes dashboard with native Authentik OIDC login.
+37. `install-twinbox-portal` renders the user portal config from step metadata and cluster state, writing it to `Secret/portal-config`.
+38. `install-dashy-dashboard` renders the legacy admin launcher config into `ConfigMap/dashy-config`.
+39. `install-management-consoles` publishes Proxmox, Longhorn, Forgejo, and SeaweedFS web UIs behind Traefik. Forgejo uses native Authentik/OIDC login; the other management consoles use Authentik proxy protection.
+40. `install-pgadmin4` deploys pgAdmin 4 with Longhorn-backed persistence and Authentik OIDC.
+41. `configure-argocd-oidc` configures Argo CD to use Authentik for SSO.
+42. Later wizard steps apply one Argo CD `Application` at a time for ingress configuration, NetBird, Cloudflare, and user applications.
 
 ## Ingress Configuration Steps
 
