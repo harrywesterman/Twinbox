@@ -76,7 +76,7 @@ Bundles group related apps into curated sets:
 | **Mijn Bureau** | Nextcloud, Outline, Jitsi |
 | **openDesk** | OpenCloud, Nextcloud, Mailu, Zulip, Jitsi |
 | **La Suite** | Outline, Nextcloud, Mailu, Zulip, Matrix, Jitsi |
-| **Twinbox Desktop** | OpenCloud, Outline, HedgeDoc, Mailu, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mastodon, Matrix, Nextcloud |
+| **Twinbox Desktop** | Outline, Mailu, Zulip, Jitsi, Immich, SearXNG, Pixelfed, Stirling PDF, Karakeep, Mastodon, Matrix, Nextcloud |
 
 ## Deployment Pattern
 

@@ -354,13 +354,26 @@ test("app catalog exposes apps while the wizard catalog keeps them out of sight"
       "install-mailu",
       "install-mastodon",
       "install-matrix",
+      "install-nextcloud",
     ]) {
       assert.ok(
         twinboxDesktopBundle?.apps.includes(appId),
         `twinbox-desktop bundle should include ${appId}`
       );
     }
-    assert.equal(twinboxDesktopBundle?.apps.includes("install-nextcloud"), false);
+    for (const appId of [
+      "install-opencloud",
+      "install-affine",
+      "install-hedgedoc",
+      "install-paperless",
+      "install-audiobookshelf",
+    ]) {
+      assert.equal(
+        twinboxDesktopBundle?.apps.includes(appId),
+        false,
+        `twinbox-desktop bundle should not include ${appId}`
+      );
+    }
     assert.equal(nextcloudCard?.title, "Install Nextcloud");
     assert.equal(nextcloudCard?.placeholder, false);
     assert.equal(nextcloudCard?.installable, true);

@@ -16,13 +16,7 @@ description: >
 
   **Whats included**
 
-  **OpenCloud** Awesome doc editor and sharing
-
   **Outline** — A fast, collaborative knowledge base for your team wiki and documentation.
-
-  **AFFiNE** — A visual workspace for notes, docs, whiteboards, and planning.
-
-  **HedgeDoc** — Real-time collaborative markdown editor for meeting notes and brainstorms.
 
   **Mailu** — Self-hosted email with webmail, admin UI, and your own SMTP edge on the bastion.
 
@@ -30,13 +24,9 @@ description: >
 
   **Jitsi** — Private video conferencing with screen sharing, no accounts needed.
 
-  **Paperless-ngx** — Document management with OCR, tagging, and full-text search.
-
   **Immich** — Self-hosted photo and video management with automatic backup from your phone.
 
   **SearXNG** — Privacy-respecting metasearch engine that aggregates results without tracking.
-
-  **Audiobookshelf** — Self-hosted audiobook and podcast server with mobile apps.
 
   **Pixelfed** — Federated image sharing, a privacy-first alternative to Instagram.
 
@@ -47,20 +37,18 @@ description: >
   **Mastodon** — A federated social network you own, with your own identity and moderation.
 
   **Matrix** — End-to-end encrypted federated chat with the Element Server Suite.
+
+  **Nextcloud** — Self-hosted file sync and collaboration with online office tools.
 apps:
-  - install-opencloud
   - install-outline
-  - install-affine
-  - install-hedgedoc
   - install-mailu
   - install-zulip
   - install-jitsi
-  - install-paperless
   - install-immich
   - install-searxng
-  - install-audiobookshelf
   - install-pixelfed
   - install-stirling-pdf
   - install-karakeep
   - install-mastodon
   - install-matrix
+  - install-nextcloud

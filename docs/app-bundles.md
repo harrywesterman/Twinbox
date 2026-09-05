@@ -6,7 +6,7 @@ Twinbox groups applications into **bundles** that install multiple related apps 
 
 | Bundle | Apps | Target Audience | Origin |
 |--------|------|----------------|--------|
-| **Twinbox Desktop** | OpenCloud, Outline, HedgeDoc, Zulip, Jitsi, Paperless, Immich, SearXNG, Audiobookshelf, Pixelfed, Stirling PDF, Karakeep, Mailu, Mastodon, Matrix, Nextcloud | Complete sovereign workspace | Twinbox |
+| **Twinbox Desktop** | Outline, Mailu, Zulip, Jitsi, Immich, SearXNG, Pixelfed, Stirling PDF, Karakeep, Mastodon, Matrix, Nextcloud | Complete sovereign workspace | Twinbox |
 | **Mijn Bureau** | Nextcloud, Outline, Jitsi | Dutch government workspace | Netherlands (BZK) |
 | **La Suite** | Outline, Nextcloud, Zulip, Jitsi | French government workspace | France (DINUM) |
 | **openDesk** | OpenCloud, Nextcloud, Zulip, Jitsi | German government workspace | Germany (ZenDiS) |
@@ -33,17 +33,18 @@ iconAlt: Twinbox Desktop icon
 description: >
   Twinbox Desktop provides a complete sovereign workspace...
 apps:
-  - install-opencloud
   - install-outline
-  - install-hedgedoc
+  - install-mailu
   - install-zulip
   - install-jitsi
-  - install-paperless
   - install-immich
   - install-searxng
-  - install-audiobookshelf
   - install-pixelfed
   - install-stirling-pdf
+  - install-karakeep
+  - install-mastodon
+  - install-matrix
+  - install-nextcloud
 ```
 
 ## How Bundles Work
