@@ -12,6 +12,8 @@ for command in aws curl jq openssl python3 scp ssh ssh-keygen tofu xorriso; do c
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 BOOTSTRAP_ROOT="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 backup_secret_dir="${BOOTSTRAP_ROOT}/secrets/cluster/${TWINBOX_CLUSTER_ID}/backup-storage"
 backup_profile="${backup_secret_dir}/metadata.json"
@@ -239,6 +241,8 @@ if [[ -n "${NETBIRD_SETUP_KEY:-}" && -n "${NETBIRD_MANAGEMENT_URL:-}" ]]; then
   NETBIRD_SETUP_KEY="$NETBIRD_SETUP_KEY" NETBIRD_MANAGEMENT_URL="$NETBIRD_MANAGEMENT_URL" \
     bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vms-netbird.sh"
 fi
-jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg storage_id "$storage_id" '{pbs_vm_id:$vm_id,node:$node,storage_id:$storage_id,verification:"backup-and-restore-read-test"}' >"${STEP_RESULT_FILE:?missing STEP_RESULT_FILE}"
+cluster_dns_domain="$(jq -r '.cluster.dns_domain // empty' <<<"$STEP_CONTEXT_JSON")"
+public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
+jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg storage_id "$storage_id" --arg pbs_admin_url "https://pbs.${public_zone_name}" '{pbs_vm_id:$vm_id,node:$node,storage_id:$storage_id,pbs_admin_url:$pbs_admin_url,verification:"backup-and-restore-read-test"}' >"${STEP_RESULT_FILE:?missing STEP_RESULT_FILE}"
 bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vm-monitoring.sh"
 log "PBS VM ${vm_id}, S3 datastore, backup job, backup, and restore-read-test completed"

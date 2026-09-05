@@ -5,6 +5,13 @@ journey_stage: setup
 summary: Provision a dedicated PBS 4 VM backed by the cluster S3 profile.
 explanation: Twinbox creates the PBS VM from the choices collected at the beginning of the wizard, then configures its S3 backend, local cache, cluster storage and backup job.
 side_help: The S3 bucket contains the durable backup data. The PBS cache disk accelerates access and must be at least 64 GiB.
+dashy:
+  items:
+    - section: Platform
+      title: Proxmox Backup Server
+      description: PBS backup administration
+      icon: si-proxmox
+      output_url_key: pbs_admin_url
 depends_on:
   - configure-backup-storage
   - install-management-backup

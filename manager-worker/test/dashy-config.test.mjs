@@ -21,6 +21,7 @@ function loadStep(stepId) {
 test("real step manifests normalize Dashy metadata", () => {
   const managementStep = loadStep("install-management-consoles");
   const seaweedfsStep = loadStep("install-seaweedfs-object-store");
+  const pbsStep = loadStep("install-proxmox-backup-server");
 
   assert.equal(managementStep.dashy.items.length, 3);
   assert.deepEqual(
@@ -31,6 +32,7 @@ test("real step manifests normalize Dashy metadata", () => {
     seaweedfsStep.dashy.items.map((item) => item.title),
     ["SeaweedFS App S3 Admin"]
   );
+  assert.deepEqual(pbsStep.dashy.items.map((item) => item.title), ["Proxmox Backup Server"]);
 });
 
 test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", () => {
