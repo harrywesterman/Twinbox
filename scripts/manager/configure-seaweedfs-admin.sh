@@ -22,15 +22,16 @@ set -euo pipefail
 install -d -m 0700 /opt/twinbox/seaweedfs-admin
 install -m 0600 /tmp/twinbox-admin.env /opt/twinbox/seaweedfs-admin/admin.env
 rm -f /tmp/twinbox-admin.env
-docker network inspect twinbox-backup >/dev/null 2>&1 || docker network create twinbox-backup >/dev/null
-if ! docker inspect seaweedfs --format "{{json .NetworkSettings.Networks}}" | grep -q '"twinbox-backup"'; then
-  docker network connect twinbox-backup seaweedfs
-fi
+master_address="$(docker inspect seaweedfs --format '{{(index .NetworkSettings.Networks "bridge").IPAddress}}')"
+[[ -n "$master_address" ]] || { echo 'SeaweedFS bridge address unavailable' >&2; exit 1; }
 image="$(docker inspect seaweedfs --format '{{.Config.Image}}')"
+if docker inspect seaweedfs-admin >/dev/null 2>&1 && ! docker inspect seaweedfs-admin --format '{{join .Config.Cmd " "}}' | grep -Fq -- "-master=${master_address}:9333"; then
+  docker rm -f seaweedfs-admin >/dev/null
+fi
 if ! docker inspect seaweedfs-admin >/dev/null 2>&1; then
-  docker run -d --name seaweedfs-admin --restart unless-stopped --network twinbox-backup \
+  docker run -d --name seaweedfs-admin --restart unless-stopped --network bridge \
     -p 127.0.0.1:23646:23646 --env-file /opt/twinbox/seaweedfs-admin/admin.env \
-    -v /opt/twinbox/seaweedfs-admin/data:/data "$image" admin -master=seaweedfs:9333 -dataDir=/data >/dev/null
+    -v /opt/twinbox/seaweedfs-admin/data:/data "$image" admin "-master=${master_address}:9333" -dataDir=/data >/dev/null
 else
   docker start seaweedfs-admin >/dev/null
 fi

@@ -605,6 +605,7 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --skip-namespace-baseline
 
 log "Reconciling Beszel user access after agent deployment"
+TWINBOX_CLUSTER_ID="$cluster_id" bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vm-monitoring.sh"
 sync_beszel_system_users
 
 log "Beszel monitoring installation complete"

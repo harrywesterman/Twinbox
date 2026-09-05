@@ -60,3 +60,4 @@ bash "$WORKSPACE_ROOT/scripts/manager/ensure-netbird-service.sh" \
   --service-name "prometheus" \
   --service-domain "prometheus.${public_zone_name}" \
   --service-path /
+TWINBOX_CLUSTER_ID="$(jq -r '.cluster.id' <<<"$STEP_CONTEXT_JSON")" bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vm-monitoring.sh"

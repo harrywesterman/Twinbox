@@ -240,4 +240,5 @@ if [[ -n "${NETBIRD_SETUP_KEY:-}" && -n "${NETBIRD_MANAGEMENT_URL:-}" ]]; then
     bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vms-netbird.sh"
 fi
 jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg storage_id "$storage_id" '{pbs_vm_id:$vm_id,node:$node,storage_id:$storage_id,verification:"backup-and-restore-read-test"}' >"${STEP_RESULT_FILE:?missing STEP_RESULT_FILE}"
+bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vm-monitoring.sh"
 log "PBS VM ${vm_id}, S3 datastore, backup job, backup, and restore-read-test completed"
