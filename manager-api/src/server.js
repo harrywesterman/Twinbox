@@ -1457,12 +1457,16 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
       return result.data;
     };
     const nodes = get("/cluster/resources?type=node");
-    const storages = [],
+    const storages = get("/cluster/resources?type=storage"),
       networks = [];
     for (const node of nodes.filter((n) => n.status === "online")) {
       const base = `/nodes/${encodeURIComponent(node.node)}`;
-      storages.push(...get(`${base}/storage`).map((s) => ({ ...s, node: node.node })));
-      networks.push(...get(`${base}/network`).map((n) => ({ ...n, node: node.node })));
+      try {
+        networks.push(...get(`${base}/network`).map((n) => ({ ...n, node: node.node })));
+      } catch {
+        // Storage placement remains discoverable when the node-network endpoint
+        // is unavailable; bridge validation still runs before provisioning.
+      }
     }
     const reserved = reservedBackupIps([...clusters, cluster], managementIp, [
       ...profiles.map((p) => p.vm?.ip_address),

@@ -23,6 +23,7 @@ def test_backup_discovery_draft_saved_cluster_and_failure(tmp_path):
 case "$*" in
   *access/ticket*) echo '{"data":{"ticket":"test"}}' ;;
   *'resources?type=node'*) echo '{"data":[{"node":"host-a","status":"online","maxmem":17179869184,"mem":0}]}' ;;
+  *'resources?type=storage'*) echo '{"data":[{"node":"host-a","storage":"disk","content":"images","active":1,"avail":1073741824000},{"node":"host-a","storage":"files","content":"iso,snippets","active":1,"avail":10737418240}]}' ;;
   */storage*) echo '{"data":[{"storage":"disk","content":"images","active":1,"avail":1073741824000},{"storage":"files","content":"iso,snippets","active":1,"avail":10737418240}]}' ;;
   */network*) echo '{"data":[{"iface":"vmbr-test","active":1}]}' ;;
   *) exit 1 ;;
