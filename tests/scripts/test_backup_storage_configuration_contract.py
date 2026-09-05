@@ -49,6 +49,17 @@ def test_worker_image_contains_s3_client_for_runtime_validation():
 def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_tree():
     script = (ROOT / "scripts/manager/provision-seaweedfs-backup-vm.sh").read_text()
     tofu = (ROOT / "infra/opentofu/seaweedfs-backup/main.tf").read_text()
+    assert 'content_type = "snippets"' not in tofu
+    assert "source_raw" not in tofu
+    assert "user_data_file_id" not in tofu
+    assert 'content_type = "iso"' in tofu
+    assert "var.cloud_init_iso_path" in tofu
+    assert "cdrom {" in tofu
+    assert "boot_order" in tofu
+    assert "-volid cidata" in script
+    assert "defer: true" in script
+    assert "sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx" in script
+    assert '"set -e; sudo install' in script
 
     assert "secrets/cluster/${TWINBOX_CLUSTER_ID}/backup-storage" in script
     assert ".vm.vm_id // empty" in script

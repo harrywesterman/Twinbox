@@ -4,7 +4,7 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
-for command in curl jq node openssl python3 scp ssh ssh-keygen tofu; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
+for command in curl jq node openssl python3 scp ssh ssh-keygen tofu xorriso; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
 : "${TWINBOX_CLUSTER_ID:?missing TWINBOX_CLUSTER_ID}"
 : "${PROXMOX_HOST:?missing PROXMOX_HOST}"
 : "${PROXMOX_USER:?missing PROXMOX_USER}"
@@ -69,9 +69,20 @@ node_name="$(jq -r '.vm.node // empty' "$profile_file" 2>/dev/null || true)"
 [[ -n "$node_name" ]] || node_name="$requested_node"
 [[ -n "$node_name" ]] || fail "Select a SeaweedFS Proxmox host in backup storage first"
 encoded_node="$(jq -rn --arg node "$node_name" '$node|@uri')"
+# A saved allocation from a failed apply is not an existing VM.
+vm_exists=false
+if [[ -n "$existing_vm_id" ]]; then
+  inventory="$(curl -fksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/cluster/resources?type=vm")"
+  actual_vm="$(jq -c --arg id "$existing_vm_id" '.data[] | select((.vmid|tostring)==$id)' <<<"$inventory")"
+  if [[ -n "$actual_vm" ]]; then
+    [[ "$(jq -r '.node' <<<"$actual_vm")" == "$node_name" && "$(jq -r '.name' <<<"$actual_vm")" == "${cluster_slug}-backup-s3" ]] || fail "Saved SeaweedFS VMID belongs to a different VM or host"
+    vm_exists=true
+  fi
+fi
 storages="$(curl -fksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/nodes/${encoded_node}/storage")"
 networks="$(curl -fksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/nodes/${encoded_node}/network")"
 existing_vm="$(jq -c '.vm // null' "$profile_file" 2>/dev/null || echo null)"
+[[ "$vm_exists" == true ]] || existing_vm=null
 file_datastore="$(jq -n --argjson cluster "$cluster_json" --argjson inputs "$STEP_INPUTS_JSON" \
   --argjson nodes "$nodes" --argjson storages "$storages" --argjson networks "$networks" \
   --argjson existing "$existing_vm" --arg node "$node_name" \
@@ -124,8 +135,9 @@ jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg 
 chmod 0600 "$profile_file"
 }
 
-cloud_init="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-cloud-init-XXXXXX")"
-trap 'rm -f "$cloud_init"' EXIT
+seed_dir="$(mktemp -d "${TMPDIR:-/tmp}/twinbox-seaweedfs-seed-XXXXXX")"
+cloud_init="${seed_dir}/user-data"
+trap 'rm -rf "$seed_dir"' EXIT
 ssh_authorized_key="$(<"$ssh_public_key")"
 cat >"$cloud_init" <<EOF
 #cloud-config
@@ -140,6 +152,7 @@ users:
       - ${ssh_authorized_key}
 write_files:
   - path: /etc/nginx/sites-available/default
+    defer: true
     content: |
       server { listen 443 ssl; ssl_certificate /etc/nginx/twinbox-server.crt; ssl_certificate_key /etc/nginx/twinbox-server.key; location / { proxy_pass http://127.0.0.1:8333; proxy_set_header Host \$host; } }
 runcmd:
@@ -153,15 +166,20 @@ runcmd:
 EOF
 
 dns_json="$(jq -cn --arg csv "$dns_csv" '$csv | split(",") | map(gsub("^\\s+|\\s+$";""))')"
+jq -n --arg id "${cluster_slug}-backup-s3-${vm_id}" --arg hostname "${cluster_slug}-backup-s3" \
+  '{"instance-id":$id,"local-hostname":$hostname}' >"${seed_dir}/meta-data"
+jq -n --arg address "${ip_address}/${prefix_length}" --arg gateway "$gateway" --argjson dns "$dns_json" \
+  '{version:2,ethernets:{primary:{match:{name:"en*"},dhcp4:false,addresses:[$address],routes:[{to:"default",via:$gateway}],nameservers:{addresses:$dns}}}}' >"${seed_dir}/network-config"
+xorriso -as mkisofs -output "${secret_dir}/cidata.iso" -volid cidata -joliet -rock \
+  "${seed_dir}/user-data" "${seed_dir}/meta-data" "${seed_dir}/network-config" >/dev/null 2>&1
 export TF_VAR_proxmox_endpoint="https://${PROXMOX_HOST}:${PROXMOX_PORT:-8006}"
 export TF_VAR_proxmox_username="$PROXMOX_USER" TF_VAR_proxmox_password="$PROXMOX_PASSWORD"
 export TF_VAR_node_name="$node_name" TF_VAR_vm_id="$vm_id" TF_VAR_vm_name="${cluster_slug}-backup-s3"
 export TF_VAR_datastore_id="$datastore" TF_VAR_file_datastore_id="$file_datastore" TF_VAR_bridge="$bridge"
-export TF_VAR_ip_address="$ip_address" TF_VAR_prefix_length="$prefix_length" TF_VAR_gateway="$gateway"
-export TF_VAR_dns_servers="$dns_json" TF_VAR_data_disk_gb="$data_disk_gb" TF_VAR_cloud_init="$(<"$cloud_init")"
+export TF_VAR_data_disk_gb="$data_disk_gb" TF_VAR_cloud_init_iso_path="${secret_dir}/cidata.iso"
 module="$WORKSPACE_ROOT/infra/opentofu/seaweedfs-backup"
 tofu -chdir="$module" init -input=false >/dev/null
-if [[ -z "$existing_vm_id" ]] && address_in_use; then
+if [[ "$vm_exists" == false ]] && address_in_use; then
   fail "SeaweedFS IP ${ip_address} became occupied before VM creation; choose another address"
 fi
 write_provisioning_profile
@@ -175,13 +193,15 @@ for attempt in $(seq 1 60); do
   sleep 5
 done
 remote_secret="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-iam-XXXXXX")"
-trap 'rm -f "$cloud_init" "$remote_secret"' EXIT
+trap 'rm -rf "$seed_dir"; rm -f "$remote_secret"' EXIT
 printf 's3.configure --user %s --access_key %s --secret_key %s --buckets %s --actions Read,Write,List,Tagging --apply true\n' \
   "$access_key_id" "$access_key_id" "$secret_access_key" "$bucket_csv" >"$remote_secret"
 chmod 0600 "$remote_secret"
 scp "${ssh_opts[@]}" "$ca_cert" "$server_cert" "$server_key" "$remote_secret" "twinbox@${ip_address}:/tmp/" >/dev/null
+# These generated basenames intentionally expand locally; SSH targets only the guest VM.
+# shellcheck disable=SC2029
 ssh "${ssh_opts[@]}" "twinbox@${ip_address}" \
-  "sudo install -m 0644 /tmp/$(basename "$ca_cert") /usr/local/share/ca-certificates/twinbox-backup-ca.crt; sudo install -m 0644 /tmp/$(basename "$server_cert") /etc/nginx/twinbox-server.crt; sudo install -m 0600 /tmp/$(basename "$server_key") /etc/nginx/twinbox-server.key; sudo update-ca-certificates; sudo docker exec -i seaweedfs weed shell </tmp/$(basename "$remote_secret"); sudo rm -f /tmp/$(basename "$ca_cert") /tmp/$(basename "$server_cert") /tmp/$(basename "$server_key") /tmp/$(basename "$remote_secret"); sudo systemctl enable --now nginx"
+  "set -e; sudo install -m 0644 /tmp/$(basename "$ca_cert") /usr/local/share/ca-certificates/twinbox-backup-ca.crt; sudo install -m 0644 /tmp/$(basename "$server_cert") /etc/nginx/twinbox-server.crt; sudo install -m 0600 /tmp/$(basename "$server_key") /etc/nginx/twinbox-server.key; sudo update-ca-certificates; sudo docker exec -i seaweedfs weed shell </tmp/$(basename "$remote_secret"); sudo rm -f /tmp/$(basename "$ca_cert") /tmp/$(basename "$server_cert") /tmp/$(basename "$server_key") /tmp/$(basename "$remote_secret"); sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx"
 
 jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg region us-east-1 \
   --arg access_key_id "$access_key_id" --arg secret_access_key "$secret_access_key" --arg ca_file "$ca_cert" --arg fingerprint "$fingerprint" \

@@ -66,7 +66,11 @@ test("missing bridge blocks host while storage remains discoverable", () => {
   assert.throws(() => validateBackupPlacement(backupHosts(data), inputs), /Bridge/);
   data.networks = fixture().networks;
   data.storages = data.storages.filter((s) => s.storage !== "files");
-  assert.equal(backupHosts(data)[0].error, "");
+  assert.match(backupHosts(data)[0].error, /No active ISO datastore/);
+  data.storages.push({ node: "large", storage: "snippets-only", content: "snippets", active: 1 });
+  assert.match(backupHosts(data)[0].error, /No active ISO datastore/);
+  data.storages.push({ node: "large", storage: "iso-only", content: "iso", active: 1 });
+  assert.equal(backupHosts(data)[0].file_datastore, "iso-only");
 });
 test("existing VM cannot move; consumed capacity is not charged a second time", () => {
   const existing = {
