@@ -1409,10 +1409,16 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
     if (req.body.cluster_id && !/^[a-zA-Z0-9_-]+$/.test(req.body.cluster_id)) {
       return res.status(400).json({ error: "Invalid cluster id" });
     }
-    const cluster = req.body.cluster_id ? loadCluster(dirs, req.body.cluster_id) : req.body.cluster;
-    if (!cluster?.bridge || !cluster.gateway_ip || cluster.node_prefix_length == null) {
-      return res.status(400).json({ error: "Complete the cluster network in question 1 first" });
-    }
+    const requestedCluster = req.body.cluster_id
+      ? loadCluster(dirs, req.body.cluster_id)
+      : req.body.cluster || {};
+    const managementIp = process.env.MANAGEMENT_VM_IP || req.body.management_ip;
+    if (!parseIPv4(managementIp, "management_ip").ok)
+      throw new Error("Management VM IP is unavailable");
+    // Question 2 can be reached before the generated defaults from question 1 have
+    // been persisted. Use the Management VM's live network as the fallback, while
+    // preserving every explicit cluster value.
+    const cluster = { ...detectHostNetworkDefaults(managementIp), ...requestedCluster };
     const clusters = fs
       .readdirSync(dirs.clusters)
       .filter((file) => file.endsWith(".json"))
@@ -1458,9 +1464,6 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
       storages.push(...get(`${base}/storage`).map((s) => ({ ...s, node: node.node })));
       networks.push(...get(`${base}/network`).map((n) => ({ ...n, node: node.node })));
     }
-    const managementIp = process.env.MANAGEMENT_VM_IP || req.body.management_ip;
-    if (!parseIPv4(managementIp, "management_ip").ok)
-      throw new Error("Management VM IP is unavailable");
     const reserved = reservedBackupIps([...clusters, cluster], managementIp, [
       ...profiles.map((p) => p.vm?.ip_address),
     ]);
