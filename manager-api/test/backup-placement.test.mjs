@@ -60,13 +60,13 @@ test("hosts are ordered by free RAM and disks filtered by host, content and acti
     /online/
   );
 });
-test("missing bridge or installation storage blocks host", () => {
+test("missing bridge blocks host while storage remains discoverable", () => {
   const data = fixture();
   data.networks = [];
   assert.throws(() => validateBackupPlacement(backupHosts(data), inputs), /Bridge/);
   data.networks = fixture().networks;
   data.storages = data.storages.filter((s) => s.storage !== "files");
-  assert.throws(() => validateBackupPlacement(backupHosts(data), inputs), /ISO\/snippets/);
+  assert.equal(backupHosts(data)[0].error, "");
 });
 test("existing VM cannot move; consumed capacity is not charged a second time", () => {
   const existing = {
