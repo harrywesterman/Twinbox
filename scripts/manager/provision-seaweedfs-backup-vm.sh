@@ -199,8 +199,9 @@ policy_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-policy-XXXXXX")"
 trap 'rm -rf "$seed_dir"; rm -f "$remote_secret" "$policy_file"' EXIT
 jq -n --argjson buckets "$(jq -cn --arg csv "$bucket_csv" '$csv|split(",")')" \
   '{Version:"2012-10-17",Statement:[{Effect:"Allow",Action:["s3:CreateBucket","s3:ListBucket"],Resource:($buckets|map("arn:aws:s3:::" + .))},{Effect:"Allow",Action:["s3:GetObject","s3:PutObject","s3:DeleteObject"],Resource:($buckets|map("arn:aws:s3:::" + . + "/*"))}]}' >"$policy_file"
-printf 's3.user.create -name %s -access_key %s -secret_key %s\ns3.policy -put -name=twinbox-backup -file=/tmp/policy.json\ns3.policy.attach -policy=twinbox-backup -user=%s\n' \
-  "$access_key_id" "$access_key_id" "$secret_access_key" "$access_key_id" >"$remote_secret"
+printf 's3.user.create -name %s -access_key %s -secret_key %s\ns3.policy -put -name=twinbox-backup -file=/tmp/policy.json\ns3.policy.attach -policy=twinbox-backup -user=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\n' \
+  "$access_key_id" "$access_key_id" "$secret_access_key" "$access_key_id" \
+  "$database_bucket" "$longhorn_bucket" "$velero_bucket" "$management_bucket" >"$remote_secret"
 chmod 0600 "$remote_secret"
 scp "${ssh_opts[@]}" "$ca_cert" "$server_cert" "$server_key" "$remote_secret" "$policy_file" "twinbox@${ip_address}:/tmp/" >/dev/null
 # These generated basenames intentionally expand locally; SSH targets only the guest VM.

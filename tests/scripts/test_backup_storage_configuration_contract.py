@@ -69,6 +69,7 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert "Twinbox Backup CA" in script
     assert "Read,Write,List,Tagging,Admin" not in script
     assert "s3:CreateBucket" in script
+    assert "s3.bucket.create -name=%s" in script
     assert 'profile_mode" == managed-seaweedfs' in script
     assert (
         "Refusing to change an existing backup storage mode implicitly"
