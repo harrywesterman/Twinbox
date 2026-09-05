@@ -159,7 +159,7 @@ upload_preview_tree() {
 
   quoted_preview_dir="$(quote_for_sh "${REMOTE_PREVIEW_DIR}")"
 
-  tar -C "${REPO_ROOT}" -czf - manager-web \
+  tar -C "${REPO_ROOT}" -czf - manager-web lib \
     | "${SSH_CMD[@]}" "${SSH_TARGET}" "rm -rf ${quoted_preview_dir} && mkdir -p ${quoted_preview_dir} && tar -xzf - -C ${quoted_preview_dir}"
 }
 
@@ -175,7 +175,7 @@ build_and_restart_remote() {
   run_remote "
     set -euo pipefail
     cd ${quoted_remote_dir}
-    docker build -t ghcr.io/harrywesterman/twinbox-manager-web:${quoted_image_tag} ${quoted_preview_dir}/manager-web
+    docker build -f ${quoted_preview_dir}/manager-web/Dockerfile -t ghcr.io/harrywesterman/twinbox-manager-web:${quoted_image_tag} ${quoted_preview_dir}
     docker compose up -d --no-deps --force-recreate manager-web
     docker compose ps manager-web
     rm -rf ${quoted_preview_dir}

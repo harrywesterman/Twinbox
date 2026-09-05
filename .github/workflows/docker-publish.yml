@@ -57,6 +57,7 @@ jobs:
               - 'scripts/get-talos-image-factory.sh'
               - 'manager-web/src/assets/step-icons/**'
             manager_web:
+              - 'lib/**'
               - 'manager-web/**'
               - 'manager-web/Dockerfile'
             portal:
@@ -115,7 +116,7 @@ jobs:
               {
                   "image_name": "twinbox-manager-web",
                   "package_name": "twinbox-manager-web",
-                  "context": "./manager-web",
+                  "context": ".",
                   "dockerfile": "./manager-web/Dockerfile",
                   "tags": "\n".join([
                       "type=raw,value=latest,enable={{is_default_branch}}",

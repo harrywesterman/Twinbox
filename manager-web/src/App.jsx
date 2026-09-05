@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import "./App.css";
+import BackupStorageFields from "./BackupStorageFields.jsx";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
 import {
   buildProvisionPlacementBoard,
@@ -704,6 +705,23 @@ function buildPlacementSuggestionKey(board) {
 }
 
 const WIZARD_GUIDES = {
+  "configure-backup-storage": {
+    eyebrow: "Backup storage",
+    title: "Choose where your backups are stored",
+    intro:
+      "Use external S3 storage or create a dedicated SeaweedFS VM on a Proxmox host of your choice.",
+    checklist: [
+      "Select a host and one of its available datastores.",
+      "Allow 20 GiB extra for the system disk.",
+      "Review the proposed IP from your cluster network.",
+    ],
+    screenshotTitle: "Dedicated backup VM",
+    screenshotLines: [
+      "Host → datastore → capacity",
+      "Editable IP proposal",
+      "Local storage does not protect against loss of the whole Proxmox environment",
+    ],
+  },
   "provision-nodes": {
     eyebrow: "Step 1",
     title: "Create the Talos cluster",
@@ -915,6 +933,7 @@ function App() {
     storedWizardState.clusterInstanceId || ""
   );
   const [cluster, setCluster] = useState(null);
+  const [backupValid, setBackupValid] = useState(false);
   const [proxmoxResources, setProxmoxResources] = useState(null);
   const [logs, setLogs] = useState([]);
   const [draggingVmName, setDraggingVmName] = useState("");
@@ -2419,6 +2438,9 @@ function App() {
         .every((input) => hasRequiredValue(input, currentDraft[input.id]))
     : false;
   const primaryActionDisabled =
+    (currentStep?.id === "configure-backup-storage" &&
+      currentDraft.backup_storage_mode === "managed-seaweedfs" &&
+      !backupValid) ||
     !provisionStepValid ||
     !questionInputsValid ||
     busy ||
@@ -3011,6 +3033,11 @@ function App() {
                   <div className="wizard-input-grid">
                     {(currentStep?.inputs || [])
                       .filter((input) => isInputVisible(input, currentDraft))
+                      .filter(
+                        (input) =>
+                          currentStep?.id !== "configure-backup-storage" ||
+                          !input.id.startsWith("seaweedfs_")
+                      )
                       .map((input) => (
                         <InputField
                           key={input.id}
@@ -3022,6 +3049,16 @@ function App() {
                           }
                         />
                       ))}
+                    {currentStep?.id === "configure-backup-storage" &&
+                      currentDraft.backup_storage_mode === "managed-seaweedfs" && (
+                        <BackupStorageFields
+                          clusterId={clusterId}
+                          clusterDraft={answers["provision-nodes"] || {}}
+                          draft={currentDraft}
+                          setAnswers={setAnswers}
+                          onValidity={setBackupValid}
+                        />
+                      )}
                     {(!currentStep?.inputs || currentStep.inputs.length === 0) && (
                       <p className="wizard-empty">
                         {isQuestionPhase

@@ -28,25 +28,26 @@ manager-api/
 
 ## Endpoints
 
-| Method | Path                                 | Description                    |
-| ------ | ------------------------------------ | ------------------------------ |
-| `GET`  | `/api/health`                        | Health check                   |
-| `GET`  | `/api/catalog`                       | Step catalog with status       |
-| `GET`  | `/api/apps/catalog`                  | App catalog with install state |
-| `POST` | `/api/apps/:stepId/install`          | Install an app                 |
-| `POST` | `/api/apps/:stepId/uninstall`        | Uninstall an app               |
-| `GET`  | `/api/ip-suggestions`                | VMID and IP suggestions        |
-| `POST` | `/api/ip-availability`               | Check IP availability          |
-| `GET`  | `/api/secrets/*`                     | Secret item lookup             |
-| `GET`  | `/api/proxmox/cluster-resources`     | Proxmox node/VM summary        |
-| `POST` | `/api/clusters`                      | Create cluster and queue apply |
-| `POST` | `/api/clusters/:clusterId/bootstrap` | Queue bootstrap                |
-| `GET`  | `/api/clusters/:clusterId`           | Cluster state                  |
-| `POST` | `/api/steps/:stepId/execute`         | Execute a step                 |
-| `POST` | `/api/steps/:stepId/skip`            | Skip a step                    |
-| `POST` | `/api/steps/:stepId/unskip`          | Unskip a step                  |
-| `GET`  | `/api/jobs/:jobId`                   | Job status                     |
-| `GET`  | `/api/jobs/:jobId/logs`              | Job log lines                  |
+| Method | Path                                 | Description                                 |
+| ------ | ------------------------------------ | ------------------------------------------- |
+| `GET`  | `/api/health`                        | Health check                                |
+| `GET`  | `/api/catalog`                       | Step catalog with status                    |
+| `GET`  | `/api/apps/catalog`                  | App catalog with install state              |
+| `POST` | `/api/apps/:stepId/install`          | Install an app                              |
+| `POST` | `/api/apps/:stepId/uninstall`        | Uninstall an app                            |
+| `GET`  | `/api/ip-suggestions`                | VMID and IP suggestions                     |
+| `POST` | `/api/ip-availability`               | Check IP availability                       |
+| `POST` | `/api/backup-storage/discovery`      | SeaweedFS hosts, datastores and IP proposal |
+| `GET`  | `/api/secrets/*`                     | Secret item lookup                          |
+| `GET`  | `/api/proxmox/cluster-resources`     | Proxmox node/VM summary                     |
+| `POST` | `/api/clusters`                      | Create cluster and queue apply              |
+| `POST` | `/api/clusters/:clusterId/bootstrap` | Queue bootstrap                             |
+| `GET`  | `/api/clusters/:clusterId`           | Cluster state                               |
+| `POST` | `/api/steps/:stepId/execute`         | Execute a step                              |
+| `POST` | `/api/steps/:stepId/skip`            | Skip a step                                 |
+| `POST` | `/api/steps/:stepId/unskip`          | Unskip a step                               |
+| `GET`  | `/api/jobs/:jobId`                   | Job status                                  |
+| `GET`  | `/api/jobs/:jobId/logs`              | Job log lines                               |
 
 ## Key Behaviors
 

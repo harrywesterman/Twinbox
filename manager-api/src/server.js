@@ -17,6 +17,7 @@ import {
 import { buildClusterPressureSummary } from "./lib/cluster-pressure.js";
 import { normalizeStorageResource, validateProxmoxCapacity } from "./lib/proxmox-capacity.js";
 import { computePlacement } from "./lib/placement.js";
+import { backupHosts, reservedBackupIps, suggestBackupIp } from "../../lib/backup-placement.mjs";
 import {
   buildAppCatalogResponse,
   buildCatalogResponse,
@@ -98,6 +99,7 @@ app.use((req, res, next) => {
     req.path.includes("/upgrades") ||
     req.path.endsWith("/cancel") ||
     req.path === "/api/ip-availability" ||
+    req.path === "/api/backup-storage/discovery" ||
     req.path === "/api/clusters" ||
     req.path === "/api/wizard/state"
   ) {
@@ -1398,6 +1400,92 @@ app.get("/api/proxmox/cluster-resources", async (_, res) => {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "failed to read cluster resources",
     });
+  }
+});
+
+app.post("/api/backup-storage/discovery", async (req, res) => {
+  let resolved;
+  try {
+    if (req.body.cluster_id && !/^[a-zA-Z0-9_-]+$/.test(req.body.cluster_id)) {
+      return res.status(400).json({ error: "Invalid cluster id" });
+    }
+    const cluster = req.body.cluster_id ? loadCluster(dirs, req.body.cluster_id) : req.body.cluster;
+    if (!cluster?.bridge || !cluster.gateway_ip || cluster.node_prefix_length == null) {
+      return res.status(400).json({ error: "Complete the cluster network in question 1 first" });
+    }
+    const clusters = fs
+      .readdirSync(dirs.clusters)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => readJson(path.join(dirs.clusters, file)));
+    const profiles = clusters.map((c) => ({
+      id: c.id,
+      vm: readJsonIfExists(
+        path.join(clusterSecretDir(process.env, c.id, "backup-storage"), "metadata.json")
+      )?.vm,
+    }));
+    const saved = profiles.find((p) => p.id === cluster.id)?.vm;
+    // Never return credentials or the SSH key path from the backup profile.
+    const existing = saved?.vm_id
+      ? {
+          vm_id: saved.vm_id,
+          node: saved.node,
+          datastore: saved.datastore,
+          ip_address: saved.ip_address,
+          data_disk_gb: saved.data_disk_gb,
+        }
+      : null;
+    resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body: new URLSearchParams({
+        username: resolved.env.PROXMOX_USER,
+        password: resolved.env.PROXMOX_PASSWORD,
+      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!auth?.data?.ticket) throw new Error("Proxmox authentication failed");
+    const headers = { Cookie: `PVEAuthCookie=${auth.data.ticket}` };
+    const get = (route) => {
+      const result = proxmoxApiRequest(`/api2/json${route}`, resolved.env, { headers });
+      if (!Array.isArray(result?.data)) throw new Error(`Unable to inspect Proxmox ${route}`);
+      return result.data;
+    };
+    const nodes = get("/cluster/resources?type=node");
+    const storages = [],
+      networks = [];
+    for (const node of nodes.filter((n) => n.status === "online")) {
+      const base = `/nodes/${encodeURIComponent(node.node)}`;
+      storages.push(...get(`${base}/storage`).map((s) => ({ ...s, node: node.node })));
+      networks.push(...get(`${base}/network`).map((n) => ({ ...n, node: node.node })));
+    }
+    const managementIp = process.env.MANAGEMENT_VM_IP || req.body.management_ip;
+    if (!parseIPv4(managementIp, "management_ip").ok)
+      throw new Error("Management VM IP is unavailable");
+    const reserved = reservedBackupIps([...clusters, cluster], managementIp, [
+      ...profiles.map((p) => p.vm?.ip_address),
+    ]);
+    let ip = existing?.ip_address || "",
+      ip_error = "";
+    if (!ip && req.body.suggest_ip !== false) {
+      try {
+        const excluded = Array.isArray(req.body.exclude_ips) ? req.body.exclude_ips : [];
+        ip = await suggestBackupIp(cluster, new Set([...reserved, ...excluded]), probeIpInUse);
+      } catch (error) {
+        ip_error = error.message;
+      }
+    }
+    return res.json({
+      hosts: backupHosts({ nodes, storages, networks, cluster }),
+      existing,
+      ip,
+      ip_error,
+      network: { gateway_ip: cluster.gateway_ip, node_prefix_length: cluster.node_prefix_length },
+      reserved_ips: [...reserved].filter((ip) => ip !== existing?.ip_address),
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Backup discovery failed" });
+  } finally {
+    resolved?.cleanup();
   }
 });
 

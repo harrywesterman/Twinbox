@@ -4,7 +4,7 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
-for command in curl jq openssl python3 scp ssh ssh-keygen tofu; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
+for command in curl jq node openssl python3 scp ssh ssh-keygen tofu; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
 : "${TWINBOX_CLUSTER_ID:?missing TWINBOX_CLUSTER_ID}"
 : "${PROXMOX_HOST:?missing PROXMOX_HOST}"
 : "${PROXMOX_USER:?missing PROXMOX_USER}"
@@ -25,6 +25,7 @@ cluster_slug="$(jq -r '.slug // .id' <<<"$cluster_json")"
 datastore="$(jq -r '.seaweedfs_datastore // empty' <<<"$STEP_INPUTS_JSON")"
 data_disk_gb="$(jq -r '.seaweedfs_data_disk_gb // 500' <<<"$STEP_INPUTS_JSON")"
 ip_address="$(jq -r '.seaweedfs_ip // empty' <<<"$STEP_INPUTS_JSON")"
+requested_node="$(jq -r '.seaweedfs_node // empty' <<<"$STEP_INPUTS_JSON")"
 bridge="$(jq -r '.bridge // "vmbr0"' <<<"$cluster_json")"
 prefix_length="$(jq -r '.node_prefix_length // empty' <<<"$cluster_json")"
 gateway="$(jq -r '.gateway_ip // empty' <<<"$cluster_json")"
@@ -33,7 +34,7 @@ file_datastore="$(jq -r '.file_datastore // .metadata.file_datastore // empty' <
 
 [[ -n "$datastore" ]] || fail "SeaweedFS Proxmox datastore is required"
 [[ "$data_disk_gb" =~ ^[0-9]+$ && "$data_disk_gb" -ge 100 ]] || fail "SeaweedFS data disk must be at least 100 GiB"
-[[ -n "$ip_address" && -n "$prefix_length" && -n "$gateway" && -n "$dns_csv" && -n "$file_datastore" ]] || fail "SeaweedFS network settings are incomplete"
+[[ -n "$ip_address" && -n "$prefix_length" && -n "$gateway" && -n "$dns_csv" ]] || fail "SeaweedFS network settings are incomplete"
 python3 - "$ip_address" "$gateway" "$prefix_length" <<'PY' || fail "SeaweedFS IP is outside the runtime-discovered cluster subnet"
 import ipaddress, sys
 ip, gateway, prefix = sys.argv[1:]
@@ -64,8 +65,18 @@ csrf="$(jq -r '.data.CSRFPreventionToken // empty' <<<"$auth")"
 [[ -n "$ticket" && -n "$csrf" ]] || fail "Proxmox authentication failed"
 nodes="$(curl -ksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/cluster/resources?type=node")"
 node_name="$(jq -r '.vm.node // empty' "$profile_file" 2>/dev/null || true)"
-[[ -n "$node_name" ]] || node_name="$(jq -r '.data | map(select(.status == "online")) | sort_by(-((.maxmem // 0) - (.mem // 0))) | .[0].node // empty' <<<"$nodes")"
-[[ -n "$node_name" ]] || fail "No online Proxmox node is available"
+[[ -z "$node_name" || -z "$requested_node" || "$node_name" == "$requested_node" ]] || fail "Refusing to move the existing SeaweedFS VM host"
+[[ -n "$node_name" ]] || node_name="$requested_node"
+[[ -n "$node_name" ]] || fail "Select a SeaweedFS Proxmox host in backup storage first"
+encoded_node="$(jq -rn --arg node "$node_name" '$node|@uri')"
+storages="$(curl -fksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/nodes/${encoded_node}/storage")"
+networks="$(curl -fksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/nodes/${encoded_node}/network")"
+existing_vm="$(jq -c '.vm // null' "$profile_file" 2>/dev/null || echo null)"
+file_datastore="$(jq -n --argjson cluster "$cluster_json" --argjson inputs "$STEP_INPUTS_JSON" \
+  --argjson nodes "$nodes" --argjson storages "$storages" --argjson networks "$networks" \
+  --argjson existing "$existing_vm" --arg node "$node_name" \
+  '{cluster:$cluster,inputs:($inputs + {seaweedfs_node:$node}),existing:$existing,nodes:$nodes.data,storages:[$storages.data[] + {node:$node}],networks:[$networks.data[] + {node:$node}]}' | \
+  node "$WORKSPACE_ROOT/scripts/manager/check-seaweedfs-placement.mjs")" || fail "SeaweedFS placement validation failed"
 vm_id="$(jq -r '.vm.vm_id // empty' "$profile_file" 2>/dev/null || true)"
 [[ -n "$vm_id" ]] || vm_id="$(curl -ksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/cluster/nextid" | jq -r '.data // empty')"
 [[ "$vm_id" =~ ^[0-9]+$ ]] || fail "Could not allocate a Proxmox VMID"
@@ -103,6 +114,7 @@ velero_bucket="$(twinbox_backup_bucket_name "$cluster_slug" velero)"
 management_bucket="$(twinbox_backup_bucket_name "$cluster_slug" management)"
 pbs_bucket="$(twinbox_backup_bucket_name "$cluster_slug" pbs)"
 bucket_csv="${database_bucket},${longhorn_bucket},${velero_bucket},${management_bucket}"
+write_provisioning_profile() {
 jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg region us-east-1 \
   --arg access_key_id "$access_key_id" --arg secret_access_key "$secret_access_key" --arg ca_file "$ca_cert" --arg fingerprint "$fingerprint" \
   --arg node "$node_name" --argjson vm_id "$vm_id" --arg datastore "$datastore" --argjson data_disk_gb "$data_disk_gb" \
@@ -110,6 +122,7 @@ jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg 
   --arg ssh_private_key "$ssh_private_key" --arg ip_address "$ip_address" \
   '{mode:$mode,endpoint:$endpoint,region:$region,path_style:true,access_key_id:$access_key_id,secret_access_key:$secret_access_key,tls:{ca_file:$ca_file,fingerprint:$fingerprint},buckets:{databases:$databases,longhorn:$longhorn,velero:$velero,management:$management,pbs:$pbs},vm:{vm_id:$vm_id,node:$node,datastore:$datastore,data_disk_gb:$data_disk_gb,ip_address:$ip_address,ssh_private_key:$ssh_private_key,status:"provisioning"}}' >"$profile_file"
 chmod 0600 "$profile_file"
+}
 
 cloud_init="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-cloud-init-XXXXXX")"
 trap 'rm -f "$cloud_init"' EXIT
@@ -148,6 +161,10 @@ export TF_VAR_ip_address="$ip_address" TF_VAR_prefix_length="$prefix_length" TF_
 export TF_VAR_dns_servers="$dns_json" TF_VAR_data_disk_gb="$data_disk_gb" TF_VAR_cloud_init="$(<"$cloud_init")"
 module="$WORKSPACE_ROOT/infra/opentofu/seaweedfs-backup"
 tofu -chdir="$module" init -input=false >/dev/null
+if [[ -z "$existing_vm_id" ]] && address_in_use; then
+  fail "SeaweedFS IP ${ip_address} became occupied before VM creation; choose another address"
+fi
+write_provisioning_profile
 tofu -chdir="$module" apply -input=false -auto-approve -state="$state_file" >/dev/null
 
 ssh_opts=(-i "$ssh_private_key" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5)

@@ -55,6 +55,12 @@ inputs:
     default: true
     help: Recommended for generic S3-compatible services.
     visible_when: { input: backup_storage_mode, equals: external-s3 }
+  - id: seaweedfs_node
+    label: SeaweedFS Proxmox host
+    type: string
+    required: true
+    help: Choose the Proxmox host for the dedicated backup VM.
+    visible_when: { input: backup_storage_mode, equals: managed-seaweedfs }
   - id: seaweedfs_datastore
     label: SeaweedFS Proxmox datastore
     type: string
