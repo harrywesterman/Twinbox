@@ -180,7 +180,7 @@ def test_agent_config_sync_projects_shared_ai_endpoint_to_apps():
     assert "externalsecret/coder-workspace-ai-provider" in script_text
 
 
-def test_agent_config_sync_restarts_only_existing_ai_consumers():
+def test_agent_config_sync_does_not_roll_coder_workspaces_during_secret_sync():
     script_text = (REPO_ROOT / "scripts" / "manager" / "sync-twinbox-agents-config.sh").read_text(
         encoding="utf-8"
     )
@@ -193,8 +193,8 @@ def test_agent_config_sync_restarts_only_existing_ai_consumers():
     ]:
         assert f'restart_deployment_if_exists "{namespace}" "{deployment}"' in script_text
 
-    assert 'restart_deployments_by_selector_if_exists "coder-workspaces"' in script_text
-    assert '"app.kubernetes.io/name=twinbox-dev-workspace"' in script_text
+    assert 'restart_deployments_by_selector_if_exists "coder-workspaces"' not in script_text
+    assert "Do not roll Coder workspaces here" in script_text
     assert "deployment not found in" in script_text
     assert "rollout restart deployment/" in script_text
 

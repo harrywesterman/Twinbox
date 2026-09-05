@@ -198,6 +198,10 @@ restart_deployment_if_exists "twinbox-agents" "twinbox-agents"
 restart_deployment_if_exists "openwebui" "openwebui"
 restart_deployment_if_exists "karakeep" "karakeep"
 restart_deployment_if_exists "paperless" "paperless"
-restart_deployments_by_selector_if_exists "coder-workspaces" "app.kubernetes.io/name=twinbox-dev-workspace"
+# Do not roll Coder workspaces here. A workspace may be starting while the
+# ExternalSecret refreshes; restarting it can briefly create a second pod and
+# exceed the namespace quota before the old pod has terminated. New workspaces
+# consume the refreshed Secret automatically, and existing ones can be
+# restarted explicitly from Coder when needed.
 
 echo "sync-twinbox-agents-config: done"
