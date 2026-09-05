@@ -1457,7 +1457,7 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
       return result.data;
     };
     const nodes = get("/cluster/resources?type=node");
-    const storages = get("/cluster/resources?type=storage"),
+    const storages = await listClusterStorageResources(),
       networks = [];
     for (const node of nodes.filter((n) => n.status === "online")) {
       const base = `/nodes/${encodeURIComponent(node.node)}`;
