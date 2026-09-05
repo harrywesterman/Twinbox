@@ -167,6 +167,8 @@ def test_workspace_namespace_grants_explicit_debug_access():
 def test_install_coder_prepares_workspace_runtime_config_without_fixed_ips():
     text = INSTALL_CODER.read_text(encoding="utf-8")
 
+    assert 'CODER_REDIRECT_URI="${CODER_HOST}/api/v2/users/oidc/callback"' in text
+    assert 'CODER_REDIRECT_URI="${CODER_HOST}/oauth/callback"' not in text
     assert "publish_coder_workspace_access" in text
     assert "coder-workspace-access" in text
     assert "discover_management_netbird_ip" in text

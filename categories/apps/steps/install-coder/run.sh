@@ -445,7 +445,9 @@ authentik_ensure_token
 authentik_setup_forward
 
 CODER_HOST="https://coder.${public_zone_name}"
-CODER_REDIRECT_URI="${CODER_HOST}/oauth/callback"
+# Coder's OIDC callback includes the API v2 users path; /oauth/callback is not
+# used by the Coder deployment and causes Authentik to reject the login.
+CODER_REDIRECT_URI="${CODER_HOST}/api/v2/users/oidc/callback"
 
 coder_db_username="coder"
 coder_db_password="$(openssl rand -hex 24)"
