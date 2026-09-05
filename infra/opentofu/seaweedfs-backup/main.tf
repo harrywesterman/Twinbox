@@ -1,5 +1,5 @@
 resource "proxmox_virtual_environment_download_file" "ubuntu" {
-  content_type = "iso"
+  content_type = "import"
   datastore_id = var.file_datastore_id
   node_name    = var.node_name
   file_name    = "ubuntu-24.04-server-cloudimg-amd64.img"

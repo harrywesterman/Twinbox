@@ -52,7 +52,7 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert 'content_type = "snippets"' not in tofu
     assert "source_raw" not in tofu
     assert "user_data_file_id" not in tofu
-    assert 'content_type = "iso"' in tofu
+    assert 'content_type = "import"' in tofu
     assert "var.cloud_init_iso_path" in tofu
     assert "cdrom {" in tofu
     assert "boot_order" in tofu

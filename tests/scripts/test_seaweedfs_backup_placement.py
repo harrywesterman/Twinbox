@@ -44,7 +44,7 @@ case "$*" in
   *access/ticket*) echo '{"data":{"ticket":"test","CSRFPreventionToken":"test"}}';;
   *'resources?type=node'*) echo '{"data":[{"node":"chosen","status":"online","maxmem":17179869184,"mem":0}]}';;
   *'resources?type=vm'*) echo '{"data":[]}';;
-  */storage*) echo '{"data":[{"storage":"disk","content":"images","active":1,"avail":1073741824000},{"storage":"files","content":"iso,snippets","active":1,"avail":10737418240}]}';;
+  */storage*) echo '{"data":[{"storage":"disk","content":"images","active":1,"avail":1073741824000},{"storage":"files","content":"iso,import,snippets","active":1,"avail":10737418240}]}';;
   */network*) echo '{"data":[{"iface":"vmbr-test","active":1}]}';;
   */nextid*) echo '{"data":123}';;
   *) [ "$TEST_SCENARIO" = retry-occupied ] && exit 0; exit 1;;
