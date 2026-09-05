@@ -183,7 +183,9 @@ if [[ "$vm_exists" == false ]] && address_in_use; then
   fail "SeaweedFS IP ${ip_address} became occupied before VM creation; choose another address"
 fi
 write_provisioning_profile
-tofu -chdir="$module" apply -input=false -auto-approve -state="$state_file" >/dev/null
+if [[ "$vm_exists" == false ]]; then
+  tofu -chdir="$module" apply -input=false -auto-approve -state="$state_file" >/dev/null
+fi
 
 ssh_opts=(-i "$ssh_private_key" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5)
 for attempt in $(seq 1 60); do
