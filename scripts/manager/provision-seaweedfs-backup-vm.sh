@@ -193,15 +193,18 @@ for attempt in $(seq 1 60); do
   sleep 5
 done
 remote_secret="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-iam-XXXXXX")"
-trap 'rm -rf "$seed_dir"; rm -f "$remote_secret"' EXIT
-printf 's3.configure --user %s --access_key %s --secret_key %s --buckets %s --actions Read,Write,List,Tagging --apply true\n' \
-  "$access_key_id" "$access_key_id" "$secret_access_key" "$bucket_csv" >"$remote_secret"
+policy_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-policy-XXXXXX")"
+trap 'rm -rf "$seed_dir"; rm -f "$remote_secret" "$policy_file"' EXIT
+jq -n --argjson buckets "$(jq -cn --arg csv "$bucket_csv" '$csv|split(",")')" \
+  '{Version:"2012-10-17",Statement:[{Effect:"Allow",Action:["s3:ListBucket"],Resource:($buckets|map("arn:aws:s3:::" + .))},{Effect:"Allow",Action:["s3:GetObject","s3:PutObject","s3:DeleteObject"],Resource:($buckets|map("arn:aws:s3:::" + . + "/*"))}]}' >"$policy_file"
+printf 's3.user.create -name %s -access_key %s -secret_key %s\ns3.policy -put -name=twinbox-backup -file=/tmp/policy.json\ns3.policy.attach -policy=twinbox-backup -user=%s\n' \
+  "$access_key_id" "$access_key_id" "$secret_access_key" "$access_key_id" >"$remote_secret"
 chmod 0600 "$remote_secret"
-scp "${ssh_opts[@]}" "$ca_cert" "$server_cert" "$server_key" "$remote_secret" "twinbox@${ip_address}:/tmp/" >/dev/null
+scp "${ssh_opts[@]}" "$ca_cert" "$server_cert" "$server_key" "$remote_secret" "$policy_file" "twinbox@${ip_address}:/tmp/" >/dev/null
 # These generated basenames intentionally expand locally; SSH targets only the guest VM.
 # shellcheck disable=SC2029
 ssh "${ssh_opts[@]}" "twinbox@${ip_address}" \
-  "set -e; sudo install -m 0644 /tmp/$(basename "$ca_cert") /usr/local/share/ca-certificates/twinbox-backup-ca.crt; sudo install -m 0644 /tmp/$(basename "$server_cert") /etc/nginx/twinbox-server.crt; sudo install -m 0600 /tmp/$(basename "$server_key") /etc/nginx/twinbox-server.key; sudo update-ca-certificates; sudo docker exec -i seaweedfs weed shell </tmp/$(basename "$remote_secret"); sudo rm -f /tmp/$(basename "$ca_cert") /tmp/$(basename "$server_cert") /tmp/$(basename "$server_key") /tmp/$(basename "$remote_secret"); sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx"
+  "set -e; sudo install -m 0644 /tmp/$(basename "$ca_cert") /usr/local/share/ca-certificates/twinbox-backup-ca.crt; sudo install -m 0644 /tmp/$(basename "$server_cert") /etc/nginx/twinbox-server.crt; sudo install -m 0600 /tmp/$(basename "$server_key") /etc/nginx/twinbox-server.key; sudo update-ca-certificates; sudo docker cp /tmp/$(basename "$policy_file") seaweedfs:/tmp/policy.json; sudo docker exec -i seaweedfs weed shell </tmp/$(basename "$remote_secret"); sudo rm -f /tmp/$(basename "$ca_cert") /tmp/$(basename "$server_cert") /tmp/$(basename "$server_key") /tmp/$(basename "$remote_secret") /tmp/$(basename "$policy_file"); sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx"
 
 jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg region us-east-1 \
   --arg access_key_id "$access_key_id" --arg secret_access_key "$secret_access_key" --arg ca_file "$ca_cert" --arg fingerprint "$fingerprint" \
