@@ -703,7 +703,7 @@ openbao_sync_secret_file() {
   local port_forward_pid=""
 
   cleanup_openbao_port_forward() {
-    if [[ -n "$port_forward_pid" ]]; then
+    if [[ -n "${port_forward_pid:-}" ]]; then
       kill "$port_forward_pid" >/dev/null 2>&1 || true
       wait "$port_forward_pid" >/dev/null 2>&1 || true
     fi
@@ -768,7 +768,7 @@ openbao_read_secret_json() {
   local port_forward_pid=""
 
   cleanup_openbao_read_port_forward() {
-    if [[ -n "$port_forward_pid" ]]; then
+    if [[ -n "${port_forward_pid:-}" ]]; then
       kill "$port_forward_pid" >/dev/null 2>&1 || true
       wait "$port_forward_pid" >/dev/null 2>&1 || true
     fi

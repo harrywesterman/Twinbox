@@ -150,6 +150,12 @@ def test_openbao_global_secret_reads_use_active_service_port_forward():
     assert 'openbao_read_secret_json "twinbox/global/${secret_name}"' in global_read_function
 
 
+def test_openbao_port_forward_cleanup_tolerates_return_trap_scope():
+    text = _read(OPENBAO_HELPER)
+
+    assert text.count('[[ -n "${port_forward_pid:-}" ]]') == 2
+
+
 def test_openbao_kubernetes_auth_uses_external_secrets_client_jwt_reviewer():
     text = _read(OPENBAO_HELPER)
     configure_function = text.split("openbao_configure_auth_and_policy() {", 1)[1].split(
