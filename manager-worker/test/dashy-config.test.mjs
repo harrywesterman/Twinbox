@@ -32,7 +32,10 @@ test("real step manifests normalize Dashy metadata", () => {
     seaweedfsStep.dashy.items.map((item) => item.title),
     ["SeaweedFS App S3 Admin"]
   );
-  assert.deepEqual(pbsStep.dashy.items.map((item) => item.title), ["Proxmox Backup Server"]);
+  assert.deepEqual(
+    pbsStep.dashy.items.map((item) => item.title),
+    ["Proxmox Backup Server"]
+  );
 });
 
 test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", () => {
