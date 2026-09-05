@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashy-config
+  namespace: dashy
+data:
+  conf.yml.tpl: |
+    pageInfo:
+      title: Admin
+      description: Twinbox Admin start pagina
+    appConfig:
+      preventWriteToDisk: true
+      faviconApi: local
+      iconSize: large
+      layout: vertical
+      theme: nord-frost
+      auth:
+        enableOidc: true
+        oidc:
+          clientId: __DASHY_OIDC_CLIENT_ID__
+          endpoint: __DASHY_OIDC_ENDPOINT__
+          scope: __DASHY_OIDC_SCOPE__
+    sections: []
