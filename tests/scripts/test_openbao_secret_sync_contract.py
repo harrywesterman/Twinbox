@@ -154,6 +154,7 @@ def test_openbao_port_forward_cleanup_tolerates_return_trap_scope():
     text = _read(OPENBAO_HELPER)
 
     assert text.count('[[ -n "${port_forward_pid:-}" ]]') == 2
+    assert text.count('rm -f "${forward_log:-}"') == 2
 
 
 def test_openbao_kubernetes_auth_uses_external_secrets_client_jwt_reviewer():

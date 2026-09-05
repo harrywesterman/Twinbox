@@ -707,7 +707,7 @@ openbao_sync_secret_file() {
       kill "$port_forward_pid" >/dev/null 2>&1 || true
       wait "$port_forward_pid" >/dev/null 2>&1 || true
     fi
-    rm -f "$forward_log"
+    rm -f "${forward_log:-}"
   }
 
   trap cleanup_openbao_port_forward RETURN
@@ -772,7 +772,7 @@ openbao_read_secret_json() {
       kill "$port_forward_pid" >/dev/null 2>&1 || true
       wait "$port_forward_pid" >/dev/null 2>&1 || true
     fi
-    rm -f "$forward_log"
+    rm -f "${forward_log:-}"
   }
 
   trap cleanup_openbao_read_port_forward RETURN
