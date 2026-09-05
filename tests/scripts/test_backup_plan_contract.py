@@ -22,6 +22,7 @@ def test_longhorn_uses_cluster_backup_profile_and_recurring_jobs():
     assert "backupTarget: __LONGHORN_BACKUP_TARGET__" in values_text
     assert "backupTargetCredentialSecret: __LONGHORN_BACKUP_SECRET_NAME__" in values_text
     assert '--from-literal=AWS_ENDPOINTS="$BACKUP_S3_ENDPOINT"' in script_text
+    assert 'rstrip(b"\\r\\n")' in script_text
     assert "load_backup_storage_profile longhorn" in script_text
     assert 'LONGHORN_BACKUP_TARGET="s3://${BACKUP_S3_BUCKET}@${BACKUP_S3_REGION}/"' in script_text
     assert "kind: RecurringJob" in script_text
@@ -33,6 +34,7 @@ def test_longhorn_uses_cluster_backup_profile_and_recurring_jobs():
     assert "retain: 14" in script_text
     assert "nodeDrainPolicy: allow-if-replica-is-stopped" in values_text
     assert "detachManuallyAttachedVolumesWhenCordoned: true" in values_text
+    assert 'systemManagedComponentsNodeSelector: "twinbox.io/role: worker"' in values_text
 
 
 def test_longhorn_maintenance_runbook_documents_the_upgrade_flow():

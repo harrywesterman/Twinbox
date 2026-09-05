@@ -39,8 +39,17 @@ load_longhorn_backup_settings() {
 
 create_or_update_longhorn_backup_secret() {
   local ca_args=()
+  local ca_tmp=""
   if [[ -n "$BACKUP_S3_CA_FILE" && -f "$BACKUP_S3_CA_FILE" ]]; then
-    ca_args+=(--from-file="AWS_CERT=${BACKUP_S3_CA_FILE}")
+    ca_tmp="$(mktemp "${TMPDIR:-/tmp}/twinbox-longhorn-ca-XXXXXX")"
+    python3 - "$BACKUP_S3_CA_FILE" "$ca_tmp" <<'PY'
+import pathlib
+import sys
+
+source, target = map(pathlib.Path, sys.argv[1:])
+target.write_bytes(source.read_bytes().rstrip(b"\r\n"))
+PY
+    ca_args+=(--from-file="AWS_CERT=${ca_tmp}")
   fi
   kubectl create namespace "$LONGHORN_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl -n "$LONGHORN_NAMESPACE" create secret generic "$LONGHORN_BACKUP_SECRET_NAME" \
@@ -49,6 +58,7 @@ create_or_update_longhorn_backup_secret() {
     --from-literal=AWS_ENDPOINTS="$BACKUP_S3_ENDPOINT" \
     "${ca_args[@]}" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  [[ -z "$ca_tmp" ]] || rm -f "$ca_tmp"
 }
 
 render_longhorn_application_manifest() {

@@ -9,7 +9,7 @@ defaultSettings:
   nodeDrainPolicy: allow-if-replica-is-stopped
   detachManuallyAttachedVolumesWhenCordoned: true
   createDefaultDiskLabeledNodes: true
-  systemManagedComponentsNodeSelector: twinbox.io/role=worker
+  systemManagedComponentsNodeSelector: "twinbox.io/role: worker"
   defaultReplicaCount: 2
   replicaAutoBalance: least-effort
   # Twinbox defaults to two replicas for homelab HA without tripling every
