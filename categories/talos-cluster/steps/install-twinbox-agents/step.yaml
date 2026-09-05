@@ -2,10 +2,32 @@ id: install-twinbox-agents
 title: Install AI Beheerteam
 type: action
 journey_stage: setup
-summary: Install the Twinbox AI beheerteam service and wire its internal token into the Portal.
-explanation: Twinbox deploys the read-only AI beheerteam service through Argo CD, stores the internal service token in OpenBao, and materializes that token for both the agents service and the Portal. The local LLM endpoint itself is configured later from the Portal.
-side_help: This installs the agent runtime only. Configure your local OpenAI-compatible endpoint from the Portal admin page after the service is ready.
-inputs: []
+summary: Install the Twinbox AI beheerteam service and configure its OpenAI-compatible endpoint.
+explanation: Twinbox deploys the read-only AI beheerteam service through Argo CD, stores its internal service token in OpenBao, and configures the shared OpenAI-compatible endpoint for the agents and AI-enabled applications.
+side_help: Use the endpoint and model exposed by your local or hosted OpenAI-compatible service. The API key is stored only in the cluster secret store and can be changed later from the Portal.
+inputs:
+  - id: ai_base_url
+    label: OpenAI-compatible Base URL
+    type: string
+    required: true
+    help: Absolute HTTP(S) URL of the OpenAI-compatible API, without a trailing slash.
+  - id: ai_model
+    label: Model
+    type: string
+    required: true
+    help: Model identifier accepted by the configured endpoint.
+  - id: ai_display_name
+    label: Display name (optional)
+    type: string
+    required: false
+    help: Friendly name shown for this endpoint in the Portal.
+  - id: ai_api_key
+    label: API key (optional)
+    type: password
+    required: false
+    sensitive: true
+    secret_field: api_key
+    help: Leave empty when the endpoint does not require authentication. Stored only as a cluster secret.
 secrets:
   files:
     KUBECONFIG_FILE:
@@ -13,6 +35,12 @@ secrets:
       item: kubeconfig
       attachment: kubeconfig
       format: file
+  env:
+    OPENAI_API_KEY:
+      scope: cluster
+      item: backup-storage-pending
+      field: api_key
+      optional: true
 runner:
   kind: script
   script: categories/talos-cluster/steps/install-twinbox-agents/run.sh

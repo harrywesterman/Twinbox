@@ -230,7 +230,15 @@ def test_twinbox_agents_has_web_wizard_install_step():
     assert step["title"] == "Install AI Beheerteam"
     assert step["type"] == "action"
     assert step["journey_stage"] == "setup"
-    assert step["inputs"] == []
+    assert {input_["id"] for input_ in step["inputs"]} == {
+        "ai_base_url",
+        "ai_model",
+        "ai_display_name",
+        "ai_api_key",
+    }
+    api_key = next(input_ for input_ in step["inputs"] if input_["id"] == "ai_api_key")
+    assert api_key["sensitive"] is True
+    assert api_key["secret_field"] == "api_key"
     assert (
         step["runner"]["script"] == "categories/talos-cluster/steps/install-twinbox-agents/run.sh"
     )
@@ -254,6 +262,9 @@ def test_twinbox_agents_install_step_applies_argocd_app_and_secret_plumbing():
     assert "rollout restart deployment/twinbox-agents" in script_text
     assert "rollout restart deployment/twinbox-portal" in script_text
     assert "OPENAI_API_KEY=" not in script_text
+    assert "STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON" in script_text
+    assert "MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR" in script_text
+    assert "sync-twinbox-agents-config.sh" in script_text
 
 
 def test_ai_consuming_app_install_steps_resync_shared_endpoint_when_configured():

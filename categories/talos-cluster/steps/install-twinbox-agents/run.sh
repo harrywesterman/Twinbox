@@ -3,12 +3,15 @@ set -euo pipefail
 
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
+: "${MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR}"
+: "${STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON}"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 TWINBOX_BOOTSTRAP_DIR="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}"
 AGENTS_NAMESPACE="${AGENTS_NAMESPACE:-twinbox-agents}"
 PORTAL_NAMESPACE="${PORTAL_NAMESPACE:-twinbox-portal}"
 AGENTS_SECRET_FILE="${TWINBOX_BOOTSTRAP_DIR}/secrets/global/twinbox-agents.json"
+PROVIDER_FILE="${MANAGER_DATA_DIR}/agents/provider.json"
 AGENTS_APP_MANIFEST="${WORKSPACE_ROOT}/gitops/apps/twinbox-agents.yaml"
 PORTAL_AGENTS_EXTERNALSECRET="${WORKSPACE_ROOT}/gitops/platform-apps/twinbox-portal/agents-externalsecret.yaml"
 
@@ -30,6 +33,7 @@ cluster_instance_id="$(printf '%s' "$cluster_json" | jq -r '.cluster_instance_id
 [[ -n "$cluster_id" ]] || fail "Could not determine cluster ID from context"
 
 mkdir -p "$(dirname "$AGENTS_SECRET_FILE")"
+mkdir -p "$(dirname "$PROVIDER_FILE")"
 
 current_secret_json="$(mktemp "${TMPDIR:-/tmp}/twinbox-agents-current-XXXXXX")"
 next_secret_json="$(mktemp "${TMPDIR:-/tmp}/twinbox-agents-next-XXXXXX")"
@@ -54,16 +58,35 @@ fi
 
 jq \
   --arg token "$agent_internal_token" \
-  '. + {TWINBOX_AGENT_INTERNAL_TOKEN: $token}' \
+  --arg api_key "${OPENAI_API_KEY:-}" \
+  'if $api_key != "" then . + {TWINBOX_AGENT_INTERNAL_TOKEN: $token, OPENAI_API_KEY: $api_key} else . + {TWINBOX_AGENT_INTERNAL_TOKEN: $token} end' \
   "$current_secret_json" >"$next_secret_json"
 mv "$next_secret_json" "$AGENTS_SECRET_FILE"
 chmod 600 "$AGENTS_SECRET_FILE"
+
+base_url="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_base_url')"
+model="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_model')"
+display_name="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_display_name // ""')"
+jq -n \
+  --arg display_name "$display_name" \
+  --arg base_url "$base_url" \
+  --arg model "$model" \
+  '{displayName: $display_name, baseUrl: ($base_url | rtrimstr("/")), model: $model, timeoutMs: 60000}' \
+  >"$PROVIDER_FILE"
+chmod 600 "$PROVIDER_FILE"
 
 log "Syncing Twinbox agents runtime secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
   --secret-name "twinbox-agents" \
   --json-file "$AGENTS_SECRET_FILE" \
   --required-keys "TWINBOX_AGENT_INTERNAL_TOKEN"
+
+log "Syncing configured AI endpoint and shared AI consumers"
+MANAGER_DATA_DIR="$MANAGER_DATA_DIR" \
+TWINBOX_BOOTSTRAP_DIR="$TWINBOX_BOOTSTRAP_DIR" \
+WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+TWINBOX_CLUSTER_ID="$cluster_id" \
+bash "$WORKSPACE_ROOT/scripts/manager/sync-twinbox-agents-config.sh"
 
 log "Applying Twinbox agents Argo CD application"
 bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
@@ -115,4 +138,4 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     }' >"$STEP_RESULT_FILE"
 fi
 
-log "Twinbox AI beheerteam installation complete. Configure the LLM endpoint in the Portal at /admin/agents."
+log "Twinbox AI beheerteam installation and endpoint configuration complete."
