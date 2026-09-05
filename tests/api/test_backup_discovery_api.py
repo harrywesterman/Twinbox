@@ -71,6 +71,9 @@ esac
         assert body["ip"] == "192.0.2.6"
         status, body = _post_json(route, {"cluster": cluster, "suggest_ip": False})
         assert body["ip"] == ""
+        status, body = _post_json(route, {"cluster_id": "prd", "cluster": cluster})
+        assert status == 200, body
+        assert body["hosts"][0]["node"] == "host-a"
         status, body = _post_json(route, {"cluster": {}})
         assert status == 200, body
         assert body["ip"] == "192.0.2.2"

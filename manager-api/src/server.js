@@ -1411,9 +1411,16 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
     if (req.body.cluster_id && !/^[a-zA-Z0-9_-]+$/.test(req.body.cluster_id)) {
       return res.status(400).json({ error: "Invalid cluster id" });
     }
-    const requestedCluster = req.body.cluster_id
-      ? loadCluster(dirs, req.body.cluster_id)
-      : req.body.cluster || {};
+    let requestedCluster = req.body.cluster || {};
+    if (req.body.cluster_id) {
+      const clusterFile = path.join(dirs.clusters, `${req.body.cluster_id}.json`);
+      // A browser can retain a cluster id from an older session while the
+      // question flow still has a complete provision-nodes draft. Discovery
+      // must remain usable in that case instead of exposing a raw ENOENT.
+      requestedCluster = fs.existsSync(clusterFile)
+        ? loadCluster(dirs, req.body.cluster_id)
+        : requestedCluster;
+    }
     const managementIp = process.env.MANAGEMENT_VM_IP || req.body.management_ip;
     if (!parseIPv4(managementIp, "management_ip").ok)
       throw new Error("Management VM IP is unavailable");
