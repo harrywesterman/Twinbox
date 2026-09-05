@@ -7,6 +7,7 @@ import YAML from "yaml";
 import { loadCatalogDefinitions } from "../../lib/catalog-definitions.mjs";
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
 import { buildDashyConfig, stepHasDashyItems } from "../../lib/dashy-config.mjs";
+import { withBackupAdminProfile } from "../../lib/dashy-backup-profile.mjs";
 
 function parseArgs(argv) {
   const options = {
@@ -229,7 +230,20 @@ function main() {
     currentCluster.cluster_instance_id ||
     currentCluster.instance_id ||
     currentCluster.id;
-  const stepStateById = readStepStates(options.managerDataDir, steps, clusterScopeId);
+  const profile = readJsonIfExists(
+    path.join(
+      process.env.TWINBOX_BOOTSTRAP_DIR || "/opt/twinbox/bootstrap",
+      "secrets",
+      "cluster",
+      currentCluster.id,
+      "backup-storage",
+      "metadata.json"
+    )
+  );
+  const stepStateById = withBackupAdminProfile(
+    readStepStates(options.managerDataDir, steps, clusterScopeId),
+    profile
+  );
 
   if (options.triggerStepId) {
     const triggerStep = steps.find((step) => step.id === options.triggerStepId);
