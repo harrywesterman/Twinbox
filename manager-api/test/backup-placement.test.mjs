@@ -26,7 +26,7 @@ function fixture() {
       { node: "offline", status: "offline" },
     ],
     storages: ["small", "large"].flatMap((node) => [
-      { node, storage: "files", content: "iso,snippets", active: 1, avail: 10 * GiB },
+      { node, storage: "files", content: "iso,import,snippets", active: 1, avail: 10 * GiB },
       { node, storage: "disk", content: "images", active: 1, avail: 520 * GiB },
       { node, storage: "disabled", content: "images", active: 1, enabled: 0, avail: 900 * GiB },
     ]),
@@ -70,7 +70,9 @@ test("missing bridge blocks host while storage remains discoverable", () => {
   data.storages.push({ node: "large", storage: "snippets-only", content: "snippets", active: 1 });
   assert.match(backupHosts(data)[0].error, /No active ISO datastore/);
   data.storages.push({ node: "large", storage: "iso-only", content: "iso", active: 1 });
-  assert.equal(backupHosts(data)[0].file_datastore, "iso-only");
+  assert.match(backupHosts(data)[0].error, /No active ISO datastore/);
+  data.storages.push({ node: "large", storage: "import-iso", content: "iso,import", active: 1 });
+  assert.equal(backupHosts(data)[0].file_datastore, "import-iso");
 });
 test("existing VM cannot move; consumed capacity is not charged a second time", () => {
   const existing = {
