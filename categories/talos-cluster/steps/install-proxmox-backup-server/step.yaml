@@ -3,16 +3,42 @@ title: Install Proxmox Backup Server
 type: action
 journey_stage: setup
 summary: Provision a dedicated PBS 4 VM backed by the cluster S3 profile.
-explanation: Twinbox creates a 4 vCPU, 8 GiB RAM PBS VM with a 32 GiB system disk, a persistent local cache disk, a least-privilege backup token, and a daily Proxmox backup job.
+explanation: Twinbox creates the PBS VM from the choices collected at the beginning of the wizard, then configures its S3 backend, local cache, cluster storage and backup job.
 side_help: The S3 bucket contains the durable backup data. The PBS cache disk accelerates access and must be at least 64 GiB.
 depends_on:
   - configure-backup-storage
   - install-management-backup
 inputs:
-  - id: pbs_datastore
-    label: PBS Proxmox datastore
+  - id: pbs_node
+    label: PBS Proxmox host
     type: string
     required: true
+  - id: pbs_cpu
+    label: PBS CPU (vCPU)
+    type: integer
+    required: true
+    min: 2
+    default: 4
+  - id: pbs_memory_gb
+    label: PBS memory (GiB)
+    type: integer
+    required: true
+    min: 4
+    default: 8
+  - id: pbs_datastore
+    label: PBS system datastore
+    type: string
+    required: true
+  - id: pbs_cache_datastore
+    label: PBS cache datastore
+    type: string
+    required: true
+  - id: pbs_system_disk_gb
+    label: PBS system disk (GiB)
+    type: integer
+    required: true
+    min: 32
+    default: 32
   - id: pbs_cache_disk_gb
     label: PBS cache disk (GiB)
     type: integer

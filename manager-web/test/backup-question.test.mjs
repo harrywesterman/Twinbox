@@ -18,4 +18,10 @@ test("backup storage is asked immediately after node provisioning", () => {
   assert.equal(disk.min, 100);
   assert.equal(disk.default, 500);
   assert.equal(isInputVisible(disk, { backup_storage_mode: "managed-seaweedfs" }), true);
+  assert.equal(steps[index + 2].id, "configure-proxmox-backup-server");
+  const pbs = steps[index + 2];
+  assert.equal(pbs.inputs.find((input) => input.id === "pbs_cpu").default, 4);
+  assert.equal(pbs.inputs.find((input) => input.id === "pbs_memory_gb").default, 8);
+  assert.equal(pbs.inputs.find((input) => input.id === "pbs_system_disk_gb").default, 32);
+  assert.equal(pbs.inputs.find((input) => input.id === "pbs_cache_disk_gb").default, 128);
 });

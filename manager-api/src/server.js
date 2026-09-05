@@ -18,6 +18,7 @@ import { buildClusterPressureSummary } from "./lib/cluster-pressure.js";
 import { normalizeStorageResource, validateProxmoxCapacity } from "./lib/proxmox-capacity.js";
 import { computePlacement } from "./lib/placement.js";
 import { backupHosts, reservedBackupIps, suggestBackupIp } from "../../lib/backup-placement.mjs";
+import { pbsHosts } from "../../lib/pbs-placement.mjs";
 import {
   buildAppCatalogResponse,
   buildCatalogResponse,
@@ -100,6 +101,7 @@ app.use((req, res, next) => {
     req.path.endsWith("/cancel") ||
     req.path === "/api/ip-availability" ||
     req.path === "/api/backup-storage/discovery" ||
+    req.path === "/api/proxmox-backup/discovery" ||
     req.path === "/api/clusters" ||
     req.path === "/api/wizard/state"
   ) {
@@ -1491,6 +1493,102 @@ app.post("/api/backup-storage/discovery", async (req, res) => {
     });
   } catch (error) {
     return res.status(400).json({ error: error.message || "Backup discovery failed" });
+  } finally {
+    resolved?.cleanup();
+  }
+});
+
+app.post("/api/proxmox-backup/discovery", async (req, res) => {
+  let resolved;
+  try {
+    if (req.body.cluster_id && !/^[a-zA-Z0-9_-]+$/.test(req.body.cluster_id)) {
+      return res.status(400).json({ error: "Invalid cluster id" });
+    }
+    const requestedCluster = req.body.cluster_id
+      ? loadCluster(dirs, req.body.cluster_id)
+      : req.body.cluster || {};
+    const managementIp = process.env.MANAGEMENT_VM_IP || req.body.management_ip;
+    if (!parseIPv4(managementIp, "management_ip").ok)
+      throw new Error("Management VM IP is unavailable");
+    const cluster = { ...detectHostNetworkDefaults(managementIp), ...requestedCluster };
+    const clusters = fs
+      .readdirSync(dirs.clusters)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => readJson(path.join(dirs.clusters, file)));
+    const profiles = clusters.map((entry) => ({
+      id: entry.id,
+      profile: readJsonIfExists(
+        path.join(clusterSecretDir(process.env, entry.id, "pbs"), "metadata.json")
+      ),
+    }));
+    const saved = profiles.find((entry) => entry.id === cluster.id)?.profile;
+    const existing = saved?.vm_id
+      ? {
+          vm_id: saved.vm_id,
+          node: saved.node,
+          datastore: saved.datastore,
+          cache_datastore: saved.cache_datastore || saved.datastore,
+          cpu: saved.cpu,
+          memory_gb: saved.memory_gb,
+          system_disk_gb: saved.system_disk_gb,
+          cache_disk_gb: saved.cache_disk_gb,
+          ip_address: saved.ip_address,
+        }
+      : null;
+    resolved = resolveSecretBundle(buildProxmoxApiSecretBundle());
+    const auth = proxmoxApiRequest("/api2/json/access/ticket", resolved.env, {
+      method: "POST",
+      body: new URLSearchParams({
+        username: resolved.env.PROXMOX_USER,
+        password: resolved.env.PROXMOX_PASSWORD,
+      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!auth?.data?.ticket) throw new Error("Proxmox authentication failed");
+    const headers = { Cookie: `PVEAuthCookie=${auth.data.ticket}` };
+    const get = (route) =>
+      proxmoxApiRequest(`/api2/json${route}`, resolved.env, { headers })?.data || [];
+    const nodes = get("/cluster/resources?type=node");
+    const storages = await listClusterStorageResources();
+    const networks = [];
+    for (const node of nodes.filter((entry) => entry.status === "online")) {
+      try {
+        networks.push(
+          ...get(`/nodes/${encodeURIComponent(node.node)}/network`).map((entry) => ({
+            ...entry,
+            node: node.node,
+          }))
+        );
+      } catch {
+        // The runner performs the authoritative bridge check before VM creation.
+      }
+    }
+    const hosts = pbsHosts({ nodes, storages, networks, cluster });
+    const reserved = reservedBackupIps(
+      [...clusters, cluster],
+      managementIp,
+      profiles.map((entry) => entry.profile?.ip_address)
+    );
+    let ip = String(req.body?.suggest_ip === false ? "" : req.body?.pbs_ip || "");
+    let ip_error = "";
+    if (!ip && req.body?.suggest_ip !== false) {
+      try {
+        const excluded = Array.isArray(req.body.exclude_ips) ? req.body.exclude_ips : [];
+        ip = await suggestBackupIp(cluster, new Set([...reserved, ...excluded]), probeIpInUse);
+      } catch (error) {
+        ip_error = error.message;
+      }
+    }
+    return res.json({
+      hosts,
+      existing,
+      ip: existing?.ip_address || ip,
+      ip_error,
+      reserved_ips: [...reserved],
+      network: { gateway_ip: cluster.gateway_ip, node_prefix_length: cluster.node_prefix_length },
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "PBS discovery failed" });
   } finally {
     resolved?.cleanup();
   }

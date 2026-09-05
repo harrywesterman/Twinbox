@@ -12,7 +12,8 @@ def test_pbs_step_and_runner_contract():
     assert "configure-backup-storage" in step
     assert "min: 64" in step
     assert "default: 128" in step
-    assert "4 vCPU" in step and "8 GiB" in step and "32 GiB" in step
+    assert "pbs_node" in step and "pbs_cache_datastore" in step
+    assert "pbs_cpu" in step and "pbs_memory_gb" in step and "pbs_system_disk_gb" in step
     assert "buckets.pbs" in runner
     assert "s3 endpoint create" in runner
     assert '--backend "type=s3,client=' in runner
@@ -35,9 +36,13 @@ def test_pbs_vm_has_required_resources_and_no_fixed_network_defaults():
     module = (ROOT / "infra/opentofu/pbs-backup/main.tf").read_text()
     variables = (ROOT / "infra/opentofu/pbs-backup/variables.tf").read_text()
 
-    assert "cores = 4" in module
-    assert "dedicated = 8192" in module
-    assert "size         = 32" in module
+    assert "cores = var.cpu" in module
+    assert "dedicated = var.memory_gb * 1024" in module
+    assert "size         = var.system_disk_gb" in module
     assert "size         = var.cache_disk_gb" in module
+    assert "datastore_id = var.cache_datastore_id" in module
+    assert 'content_type = "import"' in module
+    assert 'content_type = "snippets"' not in module
+    assert "cloud_init_iso_path" in module
     assert 'address = "${var.ip_address}/${var.prefix_length}"' in module
     assert "default" not in variables

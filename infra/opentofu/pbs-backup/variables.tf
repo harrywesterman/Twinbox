@@ -15,7 +15,11 @@ variable "prefix_length" { type = number }
 variable "gateway" { type = string }
 variable "dns_servers" { type = list(string) }
 variable "cache_disk_gb" { type = number }
-variable "cloud_init" {
+variable "cpu" { type = number }
+variable "memory_gb" { type = number }
+variable "system_disk_gb" { type = number }
+variable "cache_datastore_id" { type = string }
+variable "cloud_init_iso_path" {
   type      = string
-  sensitive = true
+  description = "Local NoCloud configuration ISO uploaded through the Proxmox API."
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import "./App.css";
 import BackupStorageFields from "./BackupStorageFields.jsx";
+import ProxmoxBackupFields, { isPbsPlacementField } from "./ProxmoxBackupFields.jsx";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
 import {
   buildProvisionPlacementBoard,
@@ -722,6 +723,23 @@ const WIZARD_GUIDES = {
       "Local storage does not protect against loss of the whole Proxmox environment",
     ],
   },
+  "configure-proxmox-backup-server": {
+    eyebrow: "Proxmox Backup Server",
+    title: "Choose where PBS runs",
+    intro:
+      "PBS is a separate Debian VM. Choose its Proxmox host, system and cache storage, resource sizes, and the proposed address before installation starts.",
+    checklist: [
+      "Select an online host and its active datastores.",
+      "Review the default 4 vCPU, 8 GiB RAM, 32 GiB system disk and 128 GiB cache.",
+      "Review the proposed free IP from the cluster network.",
+    ],
+    screenshotTitle: "PBS placement",
+    screenshotLines: [
+      "Host → system datastore → cache datastore",
+      "Editable IP proposal",
+      "S3 backend with a local cache",
+    ],
+  },
   "provision-nodes": {
     eyebrow: "Step 1",
     title: "Create the Talos cluster",
@@ -934,6 +952,7 @@ function App() {
   );
   const [cluster, setCluster] = useState(null);
   const [backupValid, setBackupValid] = useState(false);
+  const [pbsValid, setPbsValid] = useState(false);
   const [proxmoxResources, setProxmoxResources] = useState(null);
   const [logs, setLogs] = useState([]);
   const [draggingVmName, setDraggingVmName] = useState("");
@@ -1651,7 +1670,10 @@ function App() {
 
   async function executeStep(step, clusterIdOverride = clusterIdRef.current, options = {}) {
     const { manageBusy = true } = options;
-    const currentStepDraft = answersRef.current?.[step.id] || {};
+    const currentStepDraft =
+      step.id === "install-proxmox-backup-server"
+        ? answersRef.current?.["configure-proxmox-backup-server"] || {}
+        : answersRef.current?.[step.id] || {};
     const draft = currentStepDraft;
     const body = {
       inputs: buildPayloadInputs(step, draft),
@@ -2321,7 +2343,13 @@ function App() {
       currentStep
         ? buildProvisionQuestionDraft({
             step: currentStep,
-            answers,
+            answers:
+              currentStep.id === "install-proxmox-backup-server"
+                ? {
+                    ...answers,
+                    [currentStep.id]: answers["configure-proxmox-backup-server"] || {},
+                  }
+                : answers,
             suggestionSnapshot: provisionSuggestionSnapshotRef.current,
             dirtyFields: provisionDirtyFieldsRef.current,
           })
@@ -2441,6 +2469,7 @@ function App() {
     (currentStep?.id === "configure-backup-storage" &&
       currentDraft.backup_storage_mode === "managed-seaweedfs" &&
       !backupValid) ||
+    (currentStep?.id === "configure-proxmox-backup-server" && !pbsValid) ||
     !provisionStepValid ||
     !questionInputsValid ||
     busy ||
@@ -3068,6 +3097,13 @@ function App() {
                           currentStep?.id !== "configure-backup-storage" ||
                           !input.id.startsWith("seaweedfs_")
                       )
+                      .filter(
+                        (input) =>
+                          ![
+                            "configure-proxmox-backup-server",
+                            "install-proxmox-backup-server",
+                          ].includes(currentStep?.id) || !isPbsPlacementField(input)
+                      )
                       .map((input) => (
                         <InputField
                           key={input.id}
@@ -3089,6 +3125,15 @@ function App() {
                           onValidity={setBackupValid}
                         />
                       )}
+                    {currentStep?.id === "configure-proxmox-backup-server" && (
+                      <ProxmoxBackupFields
+                        clusterId={clusterId}
+                        clusterDraft={answers["provision-nodes"] || {}}
+                        draft={currentDraft}
+                        setAnswers={setAnswers}
+                        onValidity={setPbsValid}
+                      />
+                    )}
                     {(!currentStep?.inputs || currentStep.inputs.length === 0) && (
                       <p className="wizard-empty">
                         {isQuestionPhase

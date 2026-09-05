@@ -3,7 +3,7 @@ set -euo pipefail
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
-for command in aws curl jq openssl python3 scp ssh ssh-keygen tofu; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
+for command in aws curl jq openssl python3 scp ssh ssh-keygen tofu xorriso; do command -v "$command" >/dev/null 2>&1 || fail "$command not found"; done
 : "${TWINBOX_CLUSTER_ID:?missing TWINBOX_CLUSTER_ID}"
 : "${PROXMOX_HOST:?missing PROXMOX_HOST}"
 : "${PROXMOX_USER:?missing PROXMOX_USER}"
@@ -24,6 +24,11 @@ mkdir -p "$pbs_secret_dir"; chmod 0700 "$pbs_secret_dir"
 cluster_json="$(jq -c '.cluster' <<<"$STEP_CONTEXT_JSON")"
 cluster_slug="$(jq -r '.slug // .id' <<<"$cluster_json" | tr '[:upper:]_' '[:lower:]-' | sed -E 's/[^a-z0-9-]+/-/g;s/^-+|-+$//g')"
 datastore="$(jq -r '.pbs_datastore // empty' <<<"$STEP_INPUTS_JSON")"
+cache_datastore="$(jq -r '.pbs_cache_datastore // .pbs_datastore // empty' <<<"$STEP_INPUTS_JSON")"
+requested_node="$(jq -r '.pbs_node // empty' <<<"$STEP_INPUTS_JSON")"
+cpu="$(jq -r '.pbs_cpu // 4' <<<"$STEP_INPUTS_JSON")"
+memory_gb="$(jq -r '.pbs_memory_gb // 8' <<<"$STEP_INPUTS_JSON")"
+system_disk_gb="$(jq -r '.pbs_system_disk_gb // 32' <<<"$STEP_INPUTS_JSON")"
 cache_disk_gb="$(jq -r '.pbs_cache_disk_gb // 128' <<<"$STEP_INPUTS_JSON")"
 ip_address="$(jq -r '.pbs_ip // empty' <<<"$STEP_INPUTS_JSON")"
 bridge="$(jq -r '.bridge // empty' <<<"$cluster_json")"
@@ -32,12 +37,15 @@ gateway="$(jq -r '.gateway_ip // empty' <<<"$cluster_json")"
 dns_csv="$(jq -r 'if (.dns_servers|type)=="array" then .dns_servers|join(",") else .dns_servers // empty end' <<<"$cluster_json")"
 file_datastore="$(jq -r '.file_datastore // .metadata.file_datastore // empty' <<<"$cluster_json")"
 [[ -n "$datastore" ]] || fail "PBS Proxmox datastore is required"
+[[ -n "$cache_datastore" && -n "$requested_node" ]] || fail "PBS host and cache datastore are required"
 [[ "$cache_disk_gb" =~ ^[0-9]+$ && "$cache_disk_gb" -ge 64 ]] || fail "PBS cache disk must be at least 64 GiB"
 [[ -n "$ip_address" && -n "$bridge" && -n "$prefix_length" && -n "$gateway" && -n "$dns_csv" && -n "$file_datastore" ]] || fail "PBS network or datastore settings are incomplete"
 existing_datastore="$(jq -r '.datastore // empty' "$pbs_profile" 2>/dev/null || true)"
+existing_cache_datastore="$(jq -r '.cache_datastore // empty' "$pbs_profile" 2>/dev/null || true)"
 existing_cache_disk_gb="$(jq -r '.cache_disk_gb // empty' "$pbs_profile" 2>/dev/null || true)"
 existing_ip_address="$(jq -r '.ip_address // empty' "$pbs_profile" 2>/dev/null || true)"
 [[ -z "$existing_datastore" || "$datastore" == "$existing_datastore" ]] || fail "Refusing to move the existing PBS VM datastore"
+[[ -z "$existing_cache_datastore" || "$cache_datastore" == "$existing_cache_datastore" ]] || fail "Refusing to move the existing PBS cache datastore"
 [[ -z "$existing_cache_disk_gb" || "$cache_disk_gb" == "$existing_cache_disk_gb" ]] || fail "Refusing to resize the existing PBS cache disk implicitly"
 [[ -z "$existing_ip_address" || "$ip_address" == "$existing_ip_address" ]] || fail "Refusing to change the existing PBS VM IP implicitly"
 python3 - "$ip_address" "$gateway" "$prefix_length" <<'PY' || fail "PBS IP is outside the runtime-discovered cluster subnet"
@@ -71,11 +79,31 @@ ticket="$(jq -r '.data.ticket // empty' <<<"$auth")"; csrf="$(jq -r '.data.CSRFP
 pve_get() { curl -ksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}$1"; }
 pve_post() { local path="$1"; shift; curl -ksS -X POST -H "Cookie: PVEAuthCookie=${ticket}" -H "CSRFPreventionToken: ${csrf}" "$@" "${api}${path}"; }
 pve_put() { local path="$1"; shift; curl -ksS -X PUT -H "Cookie: PVEAuthCookie=${ticket}" -H "CSRFPreventionToken: ${csrf}" "$@" "${api}${path}"; }
-node_name="$(jq -r '.node // empty' "$pbs_profile" 2>/dev/null || true)"
-[[ -n "$node_name" ]] || node_name="$(pve_get '/cluster/resources?type=node' | jq -r '.data|map(select(.status=="online"))|sort_by(-((.maxmem//0)-(.mem//0)))|.[0].node//empty')"
+node_name="$requested_node"
+existing_node_name="$(jq -r '.node // empty' "$pbs_profile" 2>/dev/null || true)"
+[[ -z "$existing_node_name" || "$node_name" == "$existing_node_name" ]] || fail "Refusing to move the existing PBS VM implicitly"
 vm_id="$(jq -r '.vm_id // empty' "$pbs_profile" 2>/dev/null || true)"
 [[ -n "$vm_id" ]] || vm_id="$(pve_get '/cluster/nextid' | jq -r '.data//empty')"
 [[ "$vm_id" =~ ^[0-9]+$ && -n "$node_name" ]] || fail "Could not select a PBS VMID and node"
+node_status="$(pve_get "/nodes/${node_name}/status" | jq -r '.data.status // empty')"
+[[ "$node_status" == "online" ]] || fail "Selected PBS host ${node_name} is not online"
+bridge_info="$(pve_get "/nodes/${node_name}/network" | jq -c --arg bridge "$bridge" '[.data[]? | select(.iface == $bridge and ((.active // 1) == 1))] | length')"
+[[ "$bridge_info" == "1" ]] || fail "Bridge ${bridge} is unavailable on selected PBS host ${node_name}"
+storage_info="$(pve_get "/nodes/${node_name}/storage/${datastore}/status" | jq -c '.data // {}')"
+cache_storage_info="$(pve_get "/nodes/${node_name}/storage/${cache_datastore}/status" | jq -c '.data // {}')"
+system_content="$(jq -r '.content // empty' <<<"$storage_info")"
+cache_content="$(jq -r '.content // empty' <<<"$cache_storage_info")"
+grep -Eq '(^|,)images(,|$)' <<<"$system_content" || fail "PBS system datastore ${datastore} is not an active VM datastore on ${node_name}"
+grep -Eq '(^|,)images(,|$)' <<<"$cache_content" || fail "PBS cache datastore ${cache_datastore} is not an active VM datastore on ${node_name}"
+system_avail="$(jq -r '.avail // 0' <<<"$storage_info")"
+cache_avail="$(jq -r '.avail // 0' <<<"$cache_storage_info")"
+[[ "$system_avail" =~ ^[0-9]+$ && "$cache_avail" =~ ^[0-9]+$ ]] || fail "Could not read PBS datastore capacity"
+if [[ "$datastore" == "$cache_datastore" ]]; then
+  (( system_avail >= (system_disk_gb + cache_disk_gb) * 1024 * 1024 * 1024 )) || fail "PBS datastore ${datastore} lacks capacity for both disks"
+else
+  (( system_avail >= system_disk_gb * 1024 * 1024 * 1024 )) || fail "PBS system datastore ${datastore} lacks capacity"
+  (( cache_avail >= cache_disk_gb * 1024 * 1024 * 1024 )) || fail "PBS cache datastore ${cache_datastore} lacks capacity"
+fi
 address_in_use() {
   ping -c 1 -W 1 "$ip_address" >/dev/null 2>&1 || \
     curl -ksS --connect-timeout 1 "https://${ip_address}/" >/dev/null 2>&1 || \
@@ -89,10 +117,11 @@ ssh_private_key="${pbs_secret_dir}/vm-ssh-key"
 pbs_admin_password="$(jq -r '.admin_password // empty' "$pbs_profile" 2>/dev/null || true)"
 [[ -n "$pbs_admin_password" ]] || pbs_admin_password="$(openssl rand -base64 32 | tr -d '\n')"
 existing_token_value="$(jq -r '.token_value // empty' "$pbs_profile" 2>/dev/null || true)"
-jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg admin_password "$pbs_admin_password" --arg token_value "$existing_token_value" \
-  '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,admin_password:$admin_password,token_value:$token_value,status:"provisioning"}' >"$pbs_profile"
+jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --arg cache_datastore "$cache_datastore" --argjson cpu "$cpu" --argjson memory_gb "$memory_gb" --argjson system_disk_gb "$system_disk_gb" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg admin_password "$pbs_admin_password" --arg token_value "$existing_token_value" \
+  '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_datastore:$cache_datastore,cpu:$cpu,memory_gb:$memory_gb,system_disk_gb:$system_disk_gb,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,admin_password:$admin_password,token_value:$token_value,status:"provisioning"}' >"$pbs_profile"
 chmod 0600 "$pbs_profile" "$ssh_private_key"
-cloud_init="$(mktemp "${TMPDIR:-/tmp}/twinbox-pbs-cloud-init-XXXXXX")"; trap 'rm -f "$cloud_init"' EXIT
+seed_dir="$(mktemp -d "${TMPDIR:-/tmp}/twinbox-pbs-cloud-init-XXXXXX")"; trap 'rm -rf "$seed_dir"' EXIT
+cloud_init="${seed_dir}/user-data"
 ssh_authorized_key="$(<"${ssh_private_key}.pub")"
 cat >"$cloud_init" <<EOF
 #cloud-config
@@ -114,10 +143,13 @@ runcmd:
   - touch /run/twinbox-pbs-installed
 EOF
 dns_json="$(jq -cn --arg csv "$dns_csv" '$csv|split(",")|map(gsub("^\\s+|\\s+$";""))')"
+printf '%s\n' "instance-id: ${cluster_slug}-pbs-${vm_id}" "local-hostname: ${cluster_slug}-pbs" >"${seed_dir}/meta-data"
+jq -n --arg address "${ip_address}/${prefix_length}" --arg gateway "$gateway" --argjson dns "$dns_json" '{version:2,ethernets:{primary:{match:{name:"en*"},dhcp4:false,addresses:[$address],routes:[{to:"default",via:$gateway}],nameservers:{addresses:$dns}}}}' >"${seed_dir}/network-config"
+xorriso -as mkisofs -output "${pbs_secret_dir}/cidata.iso" -volid cidata -joliet -rock "${seed_dir}/user-data" "${seed_dir}/meta-data" "${seed_dir}/network-config" >/dev/null 2>&1
 export TF_VAR_proxmox_endpoint="https://${PROXMOX_HOST}:${PROXMOX_PORT:-8006}" TF_VAR_proxmox_username="$PROXMOX_USER" TF_VAR_proxmox_password="$PROXMOX_PASSWORD"
-export TF_VAR_node_name="$node_name" TF_VAR_vm_id="$vm_id" TF_VAR_vm_name="${cluster_slug}-pbs" TF_VAR_datastore_id="$datastore" TF_VAR_file_datastore_id="$file_datastore"
+export TF_VAR_node_name="$node_name" TF_VAR_vm_id="$vm_id" TF_VAR_vm_name="${cluster_slug}-pbs" TF_VAR_datastore_id="$datastore" TF_VAR_cache_datastore_id="$cache_datastore" TF_VAR_file_datastore_id="$file_datastore"
 export TF_VAR_bridge="$bridge" TF_VAR_ip_address="$ip_address" TF_VAR_prefix_length="$prefix_length" TF_VAR_gateway="$gateway" TF_VAR_dns_servers="$dns_json"
-export TF_VAR_cache_disk_gb="$cache_disk_gb" TF_VAR_cloud_init="$(<"$cloud_init")"
+export TF_VAR_cpu="$cpu" TF_VAR_memory_gb="$memory_gb" TF_VAR_system_disk_gb="$system_disk_gb" TF_VAR_cache_disk_gb="$cache_disk_gb" TF_VAR_cloud_init_iso_path="${pbs_secret_dir}/cidata.iso"
 module="$WORKSPACE_ROOT/infra/opentofu/pbs-backup"; tofu -chdir="$module" init -input=false >/dev/null; tofu -chdir="$module" apply -input=false -auto-approve -state="$state_file" >/dev/null
 
 ssh_opts=(-i "$ssh_private_key" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5)
@@ -200,8 +232,8 @@ latest_snapshot="$(jq -r --arg vmid "$first_vmid" '[.[]|select(.["backup-type"]=
 [[ -n "$latest_snapshot" && "$latest_snapshot" != null ]] || fail "PBS restore-read-test could not find the verification snapshot"
 ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "tmp=\$(mktemp); trap 'rm -f \"\$tmp\"' EXIT; PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client restore '${latest_snapshot}' qemu-server.conf.blob \"\$tmp\" --repository 'pve@pbs!twinbox@localhost:twinbox-s3' >/dev/null; test -s \"\$tmp\"" || fail "PBS restore-read-test failed"
 
-jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg fingerprint "$pbs_fingerprint" --arg token_value "$token_value" --arg admin_password "$pbs_admin_password" --arg storage_id "$storage_id" --arg exclude_vmids "$exclude_vmids" \
-  '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,fingerprint:$fingerprint,token_value:$token_value,admin_password:$admin_password,pve_storage_id:$storage_id,exclude_vmids:$exclude_vmids,status:"ready",verification:"backup-and-restore-read-test"}' >"$pbs_profile"
+jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --arg cache_datastore "$cache_datastore" --argjson cpu "$cpu" --argjson memory_gb "$memory_gb" --argjson system_disk_gb "$system_disk_gb" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg fingerprint "$pbs_fingerprint" --arg token_value "$token_value" --arg admin_password "$pbs_admin_password" --arg storage_id "$storage_id" --arg exclude_vmids "$exclude_vmids" \
+  '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_datastore:$cache_datastore,cpu:$cpu,memory_gb:$memory_gb,system_disk_gb:$system_disk_gb,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,fingerprint:$fingerprint,token_value:$token_value,admin_password:$admin_password,pve_storage_id:$storage_id,exclude_vmids:$exclude_vmids,status:"ready",verification:"backup-and-restore-read-test"}' >"$pbs_profile"
 chmod 0600 "$pbs_profile" "$ssh_private_key"
 if [[ -n "${NETBIRD_SETUP_KEY:-}" && -n "${NETBIRD_MANAGEMENT_URL:-}" ]]; then
   NETBIRD_SETUP_KEY="$NETBIRD_SETUP_KEY" NETBIRD_MANAGEMENT_URL="$NETBIRD_MANAGEMENT_URL" \
