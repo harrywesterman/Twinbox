@@ -2476,6 +2476,7 @@ function App() {
     !currentStep ||
     busy ||
     installInProgress ||
+    !questionInputsValid ||
     (currentStep?.id === "provision-nodes" && !provisionStepValid);
   const remainingInstallableSteps = setupSteps
     .slice(safeInstallStepIndex)
@@ -2485,6 +2486,7 @@ function App() {
     busy ||
     installInProgress ||
     remainingInstallableSteps.length === 0 ||
+    !questionInputsValid ||
     (currentStep?.id === "provision-nodes" && !provisionStepValid);
 
   const wizardGuide = getWizardGuide(currentStep?.id);
@@ -2711,6 +2713,34 @@ function App() {
                     "Watch the output below while Twinbox runs the scripts for this step."}
                 </p>
               </div>
+              {currentStep?.inputs?.length ? (
+                <section
+                  className="wizard-card wizard-install-input-panel"
+                  aria-label="Step configuration"
+                >
+                  <div className="wizard-input-block-head">
+                    <div>
+                      <p className="eyebrow">Configuration</p>
+                      <h3>Review the values for this step</h3>
+                    </div>
+                  </div>
+                  <div className="wizard-input-grid">
+                    {currentStep.inputs
+                      .filter((input) => isInputVisible(input, currentDraft))
+                      .map((input) => (
+                        <InputField
+                          key={input.id}
+                          stepId={currentStep.id}
+                          input={input}
+                          value={currentDraft[input.id]}
+                          onChange={(inputId, value) =>
+                            updateAnswer(currentStep.id, inputId, value)
+                          }
+                        />
+                      ))}
+                  </div>
+                </section>
+              ) : null}
               <section
                 ref={liveOutputRef}
                 className={`wizard-card wizard-output-panel wizard-output-panel-minimal wizard-install-output ${model.activity.runtime.isLive ? "is-live" : ""}`}

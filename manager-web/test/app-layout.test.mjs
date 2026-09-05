@@ -33,6 +33,17 @@ test("app source defines a minimal wizard shell with guided input and step-by-st
     "expected the last question to lead into the install phase"
   );
   assert.match(source, /Install all/, "expected an install-all action in the install phase");
+  assert.match(
+    source,
+    /wizard-install-input-panel/,
+    "expected required install-step inputs to be visible before execution"
+  );
+  assert.match(source, /installInProgress/, "expected install busy-state handling");
+  assert.match(
+    source,
+    /!questionInputsValid/,
+    "expected install actions to stay disabled until required inputs are filled"
+  );
   assert.match(source, /normalizeJobResult/, "expected the job polling response to be normalized");
   assert.match(
     source,
