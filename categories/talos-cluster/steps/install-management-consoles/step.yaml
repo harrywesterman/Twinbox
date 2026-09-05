@@ -13,16 +13,6 @@ dashy:
       icon: si-proxmox
       url_template: https://proxmox.__ZONE_NAME__
     - section: Platform
-      title: SeaweedFS
-      description: S3-compatible backup storage
-      icon: fas fa-box-archive
-      url_template: https://seaweedfs.__ZONE_NAME__
-    - section: Platform
-      title: SeaweedFS Admin
-      description: SeaweedFS administration console
-      icon: fas fa-sliders
-      url_template: https://seaweedfs-admin.__ZONE_NAME__
-    - section: Platform
       title: Web Wizard
       description: Cluster setup wizard
       icon: install-web-wizard

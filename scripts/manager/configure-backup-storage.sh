@@ -104,11 +104,14 @@ fi
 chmod 0600 "$profile_file"
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
+  seaweedfs_backup_admin_url=""
+  [[ "$mode" == "managed-seaweedfs" ]] && seaweedfs_backup_admin_url="$endpoint"
   jq -n \
     --arg mode "$mode" --arg endpoint "$endpoint" --arg region "$region" \
     --arg databases "$database_bucket" --arg longhorn "$longhorn_bucket" \
     --arg velero "$velero_bucket" --arg management "$management_bucket" --arg pbs "$pbs_bucket" \
-    '{mode:$mode,endpoint:$endpoint,region:$region,secret_ref:{scope:"cluster",item:"backup-storage"},buckets:{databases:$databases,longhorn:$longhorn,velero:$velero,management:$management,pbs:$pbs}}' \
+    --arg seaweedfs_backup_admin_url "$seaweedfs_backup_admin_url" \
+    '{mode:$mode,endpoint:$endpoint,region:$region,seaweedfs_backup_admin_url:$seaweedfs_backup_admin_url,secret_ref:{scope:"cluster",item:"backup-storage"},buckets:{databases:$databases,longhorn:$longhorn,velero:$velero,management:$management,pbs:$pbs}}' \
     >"$STEP_RESULT_FILE"
 fi
 

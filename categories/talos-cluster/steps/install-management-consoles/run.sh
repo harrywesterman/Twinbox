@@ -615,7 +615,7 @@ upsert_env_value() {
     END {
       if (!written) {
         print key "=" value
-      }
+      },
     }
   ' "$env_file" >"$tmp_file"
   mv "$tmp_file" "$env_file"
@@ -1079,15 +1079,13 @@ if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
     --arg proxmox_route "proxmox" \
     --arg webwizard_route "webwizard" \
     --arg forgejo_route "forgejo" \
-    --arg seaweedfs_app_admin_route "s3-admin" \
     '{
       traefik_route: $traefik_route,
       longhorn_route: $longhorn_route,
       hubble_route: $hubble_route,
       proxmox_route: $proxmox_route,
       webwizard_route: $webwizard_route,
-      forgejo_route: $forgejo_route,
-      seaweedfs_app_admin_route: $seaweedfs_app_admin_route
+      forgejo_route: $forgejo_route
     }' >"$STEP_RESULT_FILE"
 fi
 

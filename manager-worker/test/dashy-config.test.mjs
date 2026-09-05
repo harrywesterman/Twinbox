@@ -22,10 +22,10 @@ test("real step manifests normalize Dashy metadata", () => {
   const managementStep = loadStep("install-management-consoles");
   const seaweedfsStep = loadStep("install-seaweedfs-object-store");
 
-  assert.equal(managementStep.dashy.items.length, 5);
+  assert.equal(managementStep.dashy.items.length, 3);
   assert.deepEqual(
     managementStep.dashy.items.map((item) => item.title),
-    ["Proxmox", "SeaweedFS", "SeaweedFS Admin", "Web Wizard", "Forgejo"]
+    ["Proxmox", "Web Wizard", "Forgejo"]
   );
   assert.deepEqual(
     seaweedfsStep.dashy.items.map((item) => item.title),
@@ -110,12 +110,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
   assert(
     platformSection.items.some(
       (item) =>
-        item.title === "SeaweedFS Admin" && item.url === "https://seaweedfs-admin.tst.example.com"
-    )
-  );
-  assert(
-    platformSection.items.some(
-      (item) =>
         item.title === "SeaweedFS App S3 Admin" && item.url === "https://s3-admin.tst.example.com"
     )
   );
@@ -161,8 +155,6 @@ test("buildDashyConfig renders fixed, static, dynamic, and multi-item entries", 
     "Prometheus",
     "Loki",
     "Proxmox",
-    "SeaweedFS",
-    "SeaweedFS Admin",
     "SeaweedFS App S3 Admin",
     "Web Wizard",
     "Twinbox Portal",

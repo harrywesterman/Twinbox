@@ -5,6 +5,13 @@ journey_stage: setup
 summary: Configure the cluster-wide S3-compatible backup target.
 explanation: Use an existing external S3-compatible service or let Twinbox provision a dedicated SeaweedFS backup VM. External credentials are stored as cluster secrets and are never written to job state or logs.
 side_help: External S3 provides off-site protection. A managed SeaweedFS VM is local backup storage and does not protect against failure of the complete Proxmox environment.
+dashy:
+  items:
+    - section: Platform
+      title: SeaweedFS Backup VM
+      description: Dedicated S3 backup storage administration
+      icon: fas fa-box-archive
+      output_url_key: seaweedfs_backup_admin_url
 depends_on:
   - provision-nodes
 inputs:
