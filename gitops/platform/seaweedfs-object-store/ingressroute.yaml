@@ -22,7 +22,7 @@ spec:
         - name: seaweedfs-cache-prefix
       services:
         - kind: Service
-          name: seaweedfs-filer
+          name: seaweedfs-object-store-filer
           port: 8888
   tls: {}
 ---
@@ -41,7 +41,7 @@ spec:
         - name: seaweedfs-cache-prefix
       services:
         - kind: Service
-          name: seaweedfs-filer
+          name: seaweedfs-object-store-filer
           port: 8888
 ---
 apiVersion: traefik.io/v1alpha1
@@ -60,7 +60,7 @@ spec:
           namespace: longhorn-system
       services:
         - kind: Service
-          name: seaweedfs-admin
+          name: seaweedfs-object-store-admin
           port: 23646
   tls: {}
 ---
@@ -80,7 +80,7 @@ spec:
           namespace: longhorn-system
       services:
         - kind: Service
-          name: seaweedfs-admin
+          name: seaweedfs-object-store-admin
           port: 23646
 ---
 apiVersion: traefik.io/v1alpha1

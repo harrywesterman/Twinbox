@@ -6,7 +6,7 @@ set -euo pipefail
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 SEAWEEDFS_NAMESPACE="${SEAWEEDFS_NAMESPACE:-seaweedfs}"
 SEAWEEDFS_APP_NAME="${SEAWEEDFS_APP_NAME:-seaweedfs-object-store}"
-SEAWEEDFS_APP_S3_ENDPOINT="${SEAWEEDFS_APP_S3_ENDPOINT:-http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333}"
+SEAWEEDFS_APP_S3_ENDPOINT="${SEAWEEDFS_APP_S3_ENDPOINT:-http://seaweedfs-object-store-s3.seaweedfs.svc.cluster.local:8333}"
 SEAWEEDFS_APP_REGION="${SEAWEEDFS_APP_REGION:-seaweedfs}"
 SEAWEEDFS_MASTODON_BUCKET="${SEAWEEDFS_MASTODON_BUCKET:-mastodon}"
 SEAWEEDFS_MASTODON_USERNAME="${SEAWEEDFS_MASTODON_USERNAME:-mastodon}"
@@ -61,8 +61,8 @@ wait_for_s3_shell() {
   local attempt=1
 
   while true; do
-    if kubectl -n "$SEAWEEDFS_NAMESPACE" exec deployment/seaweedfs-s3 -- \
-      sh -lc 'printf "s3.config.show\n" | weed shell -master=seaweedfs-master-0.seaweedfs-master.seaweedfs:9333' >/dev/null 2>&1; then
+    if kubectl -n "$SEAWEEDFS_NAMESPACE" exec deployment/seaweedfs-object-store-s3 -- \
+      sh -lc 'printf "s3.config.show\n" | weed shell -master=seaweedfs-object-store-master-0.seaweedfs-object-store-master.seaweedfs:9333' >/dev/null 2>&1; then
       log "SeaweedFS S3 shell is ready"
       return 0
     fi
@@ -80,8 +80,8 @@ wait_for_s3_shell() {
 run_weed_shell() {
   local command="$1"
 
-  kubectl -n "$SEAWEEDFS_NAMESPACE" exec deployment/seaweedfs-s3 -- \
-    sh -lc "printf '%s\n' \"$command\" | weed shell -master=seaweedfs-master-0.seaweedfs-master.seaweedfs:9333"
+  kubectl -n "$SEAWEEDFS_NAMESPACE" exec deployment/seaweedfs-object-store-s3 -- \
+    sh -lc "printf '%s\n' \"$command\" | weed shell -master=seaweedfs-object-store-master-0.seaweedfs-object-store-master.seaweedfs:9333"
 }
 
 sync_mastodon_s3_secret() {
@@ -151,11 +151,11 @@ bash "$WORKSPACE_ROOT/scripts/manager/apply-argocd-application.sh" \
   --application "$SEAWEEDFS_APP_NAME" \
   --destination-namespace "$SEAWEEDFS_NAMESPACE"
 
-wait_for_rollout "statefulset/seaweedfs-master" "SeaweedFS master"
-wait_for_rollout "statefulset/seaweedfs-volume" "SeaweedFS volume"
-wait_for_rollout "statefulset/seaweedfs-filer" "SeaweedFS filer"
-wait_for_rollout "deployment/seaweedfs-s3" "SeaweedFS S3 gateway"
-wait_for_rollout "statefulset/seaweedfs-admin" "SeaweedFS admin"
+wait_for_rollout "statefulset/seaweedfs-object-store-master" "SeaweedFS master"
+wait_for_rollout "statefulset/seaweedfs-object-store-volume" "SeaweedFS volume"
+wait_for_rollout "statefulset/seaweedfs-object-store-filer" "SeaweedFS filer"
+wait_for_rollout "deployment/seaweedfs-object-store-s3" "SeaweedFS S3 gateway"
+wait_for_rollout "statefulset/seaweedfs-object-store-admin" "SeaweedFS admin"
 wait_for_s3_shell
 sync_mastodon_s3_secret
 configure_mastodon_bucket

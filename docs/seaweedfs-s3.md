@@ -15,6 +15,6 @@ The dedicated VM uses a persistent data disk, a runtime-validated LAN address, T
 
 ## Application media
 
-The cluster-native installation remains GitOps-managed by `gitops/apps/seaweedfs-object-store.yaml` and `gitops/values/seaweedfs-object-store.yaml`. Application credentials are separate from backup credentials. Mastodon, for example, uses its own bucket and OpenBao secret through the in-cluster endpoint `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333`.
+The cluster-native installation remains GitOps-managed by `gitops/apps/seaweedfs-object-store.yaml` and `gitops/values/seaweedfs-object-store.yaml`. Application credentials are separate from backup credentials. Mastodon, for example, uses its own bucket and OpenBao secret through the in-cluster endpoint `http://seaweedfs-object-store-s3.seaweedfs.svc.cluster.local:8333`.
 
 Do not point backup consumers at the application-media installation, and do not point applications at the backup profile.

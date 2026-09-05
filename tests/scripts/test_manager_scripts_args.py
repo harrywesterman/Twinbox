@@ -1097,7 +1097,7 @@ def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
     assert "allInOne:" in values_text and "enabled: false" in values_text
 
     assert "SEAWEEDFS_APP_S3_ENDPOINT" in step_text
-    assert "http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333" in step_text
+    assert "http://seaweedfs-object-store-s3.seaweedfs.svc.cluster.local:8333" in step_text
     assert 'openbao_read_secret_json "$SEAWEEDFS_MASTODON_SECRET_PATH"' in step_text
     assert (
         'SEAWEEDFS_MASTODON_SECRET_PATH="${SEAWEEDFS_MASTODON_SECRET_PATH:-twinbox/apps/mastodon/s3}"'
@@ -1126,9 +1126,9 @@ def test_seaweedfs_object_store_routes_use_s3_hosts_without_replacing_backup_rou
     assert "name: seaweedfs-cache-prefix" in route_text
     assert "prefix: /buckets/mastodon" in route_text
     assert "name: authentik-forwardauth" in route_text
-    assert "name: seaweedfs-filer" in route_text
+    assert "name: seaweedfs-object-store-filer" in route_text
     assert "port: 8888" in route_text
-    assert "name: seaweedfs-admin" in route_text
+    assert "name: seaweedfs-object-store-admin" in route_text
     assert "port: 23646" in route_text
 
     assert (
@@ -1149,7 +1149,10 @@ def test_seaweedfs_object_store_routes_use_s3_hosts_without_replacing_backup_rou
 
     assert "hostname: s3.__ZONE_NAME__" in mastodon_app_text
     assert "alias_host: s3.__ZONE_NAME__" in mastodon_app_text
-    assert "endpoint: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333" in mastodon_values_text
+    assert (
+        "endpoint: http://seaweedfs-object-store-s3.seaweedfs.svc.cluster.local:8333"
+        in mastodon_values_text
+    )
     assert "bucket: mastodon" in mastodon_values_text
     assert "key: twinbox/apps/mastodon/s3" in mastodon_s3_secret_text
     assert "key: twinbox/global/velero" not in mastodon_s3_secret_text
@@ -6011,7 +6014,7 @@ def test_cluster_native_seaweedfs_admin_routes_to_the_admin_web_port():
     assert text.count("name: authentik-forwardauth") == 2
     assert text.count("port: 8333") == 0
     assert text.count("port: 8888") == 2
-    assert "name: seaweedfs-admin" in admin_text
+    assert "name: seaweedfs-object-store-admin" in admin_text
     assert "port: 23646" in admin_text
 
 

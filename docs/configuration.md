@@ -307,7 +307,7 @@ The full profile is stored at `/opt/twinbox/bootstrap/secrets/cluster/<cluster-i
 - `install-management-backup` writes Talos etcd snapshots and restic data to separate prefixes in the profile's Management bucket.
 - CloudNativePG ObjectStores are rendered per cluster into the database bucket with a distinct prefix per database.
 - `install-proxmox-backup-server` provisions PBS 4 with a persistent local cache and the reserved PBS bucket, registers a least-privilege token on all Proxmox nodes, and installs a daily job retaining 14 daily, 8 weekly, and 12 monthly backups.
-- `install-seaweedfs-object-store` installs a separate Kubernetes SeaweedFS deployment for app media. Its S3 endpoint is `http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333`, Mastodon uses bucket `mastodon`, and public media is served from `s3.<ZONE_NAME>`. The admin UI is published as `s3-admin.<ZONE_NAME>` and appears in Dashy.
+- `install-seaweedfs-object-store` installs a separate Kubernetes SeaweedFS deployment for app media. Its S3 endpoint is `http://seaweedfs-object-store-s3.seaweedfs.svc.cluster.local:8333`, Mastodon uses bucket `mastodon`, and public media is served from `s3.<ZONE_NAME>`. The admin UI is published as `s3-admin.<ZONE_NAME>` and appears in Dashy.
 - Later application steps write bootstrap JSON into OpenBao before enabling their Argo CD applications.
 
 ## Dynamic Domain Configuration
