@@ -102,6 +102,10 @@ esac
         assert body["ip"] == "192.0.2.6"
         assert body["existing"]["vm_id"] == 123
         assert "never-return" not in json.dumps(body)
+        pbs_route = f"{base}/api/proxmox-backup/discovery"
+        status, body = _post_json(pbs_route, {"cluster_id": "prd", "cluster": cluster})
+        assert status == 200, body
+        assert body["hosts"][0]["node"] == "host-a"
         curl.write_text("#!/bin/sh\nexit 1\n")
         assert _post_json(route, {"cluster_id": "test"})[0] == 400
     finally:
