@@ -127,7 +127,7 @@ longhorn_bucket="$(twinbox_backup_bucket_name "$cluster_slug" longhorn)"
 velero_bucket="$(twinbox_backup_bucket_name "$cluster_slug" velero)"
 management_bucket="$(twinbox_backup_bucket_name "$cluster_slug" management)"
 pbs_bucket="$(twinbox_backup_bucket_name "$cluster_slug" pbs)"
-bucket_csv="${database_bucket},${longhorn_bucket},${velero_bucket},${management_bucket}"
+bucket_csv="${database_bucket},${longhorn_bucket},${velero_bucket},${management_bucket},${pbs_bucket}"
 write_provisioning_profile() {
 jq -n --arg mode managed-seaweedfs --arg endpoint "https://${ip_address}" --arg region us-east-1 \
   --arg access_key_id "$access_key_id" --arg secret_access_key "$secret_access_key" --arg ca_file "$ca_cert" --arg fingerprint "$fingerprint" \
@@ -202,9 +202,9 @@ policy_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-seaweedfs-policy-XXXXXX")"
 trap 'rm -rf "$seed_dir"; rm -f "$remote_secret" "$policy_file"' EXIT
 jq -n --argjson buckets "$(jq -cn --arg csv "$bucket_csv" '$csv|split(",")')" \
   '{Version:"2012-10-17",Statement:[{Effect:"Allow",Action:["s3:CreateBucket","s3:ListBucket"],Resource:($buckets|map("arn:aws:s3:::" + .))},{Effect:"Allow",Action:["s3:GetObject","s3:PutObject","s3:DeleteObject"],Resource:($buckets|map("arn:aws:s3:::" + . + "/*"))}]}' >"$policy_file"
-printf 's3.user.create -name %s -access_key %s -secret_key %s\ns3.policy -put -name=twinbox-backup -file=/tmp/policy.json\ns3.policy.attach -policy=twinbox-backup -user=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\n' \
+printf 's3.user.create -name %s -access_key %s -secret_key %s\ns3.policy -put -name=twinbox-backup -file=/tmp/policy.json\ns3.policy.attach -policy=twinbox-backup -user=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\ns3.bucket.create -name=%s\n' \
   "$access_key_id" "$access_key_id" "$secret_access_key" "$access_key_id" \
-  "$database_bucket" "$longhorn_bucket" "$velero_bucket" "$management_bucket" >"$remote_secret"
+  "$database_bucket" "$longhorn_bucket" "$velero_bucket" "$management_bucket" "$pbs_bucket" >"$remote_secret"
 chmod 0600 "$remote_secret"
 scp "${ssh_opts[@]}" "$ca_cert" "$server_cert" "$server_key" "$remote_secret" "$policy_file" "twinbox@${ip_address}:/tmp/" >/dev/null
 # These generated basenames intentionally expand locally; SSH targets only the guest VM.

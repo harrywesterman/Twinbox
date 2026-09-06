@@ -85,7 +85,7 @@ test_bucket() {
   rm -f "$body" "$downloaded"
 }
 
-for bucket in "$database_bucket" "$longhorn_bucket" "$velero_bucket" "$management_bucket"; do
+for bucket in "$database_bucket" "$longhorn_bucket" "$velero_bucket" "$management_bucket" "$pbs_bucket"; do
   ensure_bucket "$bucket"
   test_bucket "$bucket"
 done

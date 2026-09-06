@@ -28,6 +28,10 @@ def test_backup_storage_script_derives_cluster_scoped_bucket_names_and_tests_obj
     assert "s3api head-object" in script
     assert "s3api get-object" in script
     assert "s3api delete-object" in script
+    bucket_loop = script.split("for bucket in ", 1)[1].split("done", 1)[0]
+    assert '"$pbs_bucket"' in bucket_loop
+    assert 'ensure_bucket "$bucket"' in bucket_loop
+    assert 'test_bucket "$bucket"' in bucket_loop
     assert "secrets/cluster/${cluster_id}/backup-storage/metadata.json" in script
 
 
@@ -75,6 +79,10 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert "Read,Write,List,Tagging,Admin" not in script
     assert "s3:CreateBucket" in script
     assert "s3.bucket.create -name=%s" in script
+    assert '${management_bucket},${pbs_bucket}"' in script
+    iam_commands = script.split("printf 's3.user.create", 1)[1].split('>"$remote_secret"', 1)[0]
+    assert iam_commands.count("s3.bucket.create -name=%s") == 5
+    assert '"$management_bucket" "$pbs_bucket"' in iam_commands
     assert 'profile_mode" == managed-seaweedfs' in script
     assert (
         "Refusing to change an existing backup storage mode implicitly"
