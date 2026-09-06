@@ -674,6 +674,10 @@ def test_apply_cluster_uses_pinned_defaults_and_tofu():
     assert "--vm-node-map) shift 2 ;;" in text
     assert 'command -v "$TOFU_BIN"' in text
     assert '"$TOFU_BIN" -chdir="$work_module_dir" init -input=false' in text
+    assert "tofu_init() {" in text
+    assert 'TOFU_INIT_MAX_ATTEMPTS="${TOFU_INIT_MAX_ATTEMPTS:-5}"' in text
+    assert 'TOFU_INIT_RETRY_DELAY_SECONDS="${TOFU_INIT_RETRY_DELAY_SECONDS:-5}"' in text
+    assert "OpenTofu init failed (attempt ${attempt}/${TOFU_INIT_MAX_ATTEMPTS}); retrying" in text
     assert 'TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"' in text
     assert (
         '"$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"'

@@ -9,6 +9,24 @@ USAGE
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
+
+tofu_init() {
+  local attempt=1
+
+  while true; do
+    if "$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color; then
+      return 0
+    fi
+
+    if (( attempt >= TOFU_INIT_MAX_ATTEMPTS )); then
+      return 1
+    fi
+
+    log "OpenTofu init failed (attempt ${attempt}/${TOFU_INIT_MAX_ATTEMPTS}); retrying in ${TOFU_INIT_RETRY_DELAY_SECONDS}s"
+    sleep "$TOFU_INIT_RETRY_DELAY_SECONDS"
+    attempt=$((attempt + 1))
+  done
+}
 array_contains() {
   local needle="$1"
   shift || true
@@ -60,6 +78,8 @@ command -v helm >/dev/null 2>&1 || fail "helm not found"
 export TF_IN_AUTOMATION=1
 export NO_COLOR=1
 TOFU_PARALLELISM="${TOFU_PARALLELISM:-1}"
+TOFU_INIT_MAX_ATTEMPTS="${TOFU_INIT_MAX_ATTEMPTS:-5}"
+TOFU_INIT_RETRY_DELAY_SECONDS="${TOFU_INIT_RETRY_DELAY_SECONDS:-5}"
 PROXMOX_UPLOAD_MAX_ATTEMPTS="${PROXMOX_UPLOAD_MAX_ATTEMPTS:-5}"
 # Proxmox may report a successful upload before the imported raw image has
 # finished being written to its storage backend. Keep polling long enough for
@@ -1879,7 +1899,7 @@ log "Talos host map: $(jq -c '.vm_node_map' "$tfvars_file")"
 validate_vm_ids_available "$nodes_json"
 
 log "Preparing OpenTofu module"
-"$TOFU_BIN" -chdir="$work_module_dir" init -input=false -no-color
+tofu_init
 remove_legacy_talos_file_state "$work_module_dir"
 log "Creating Proxmox VMs"
 "$TOFU_BIN" -chdir="$work_module_dir" apply -input=false -auto-approve -no-color -parallelism="$TOFU_PARALLELISM" -var-file="$tfvars_file"

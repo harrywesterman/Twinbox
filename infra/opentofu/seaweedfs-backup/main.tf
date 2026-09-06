@@ -4,6 +4,7 @@ resource "proxmox_virtual_environment_download_file" "ubuntu" {
   node_name    = var.node_name
   file_name    = "ubuntu-24.04-server-cloudimg-amd64.qcow2"
   url          = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+  overwrite_unmanaged = true
 }
 
 resource "proxmox_virtual_environment_file" "cloud_init" {
@@ -14,6 +15,8 @@ resource "proxmox_virtual_environment_file" "cloud_init" {
     path      = var.cloud_init_iso_path
     file_name = "${var.vm_name}-cidata.iso"
   }
+  overwrite  = true
+  depends_on = [proxmox_virtual_environment_download_file.ubuntu]
 }
 
 resource "proxmox_virtual_environment_vm" "seaweedfs" {

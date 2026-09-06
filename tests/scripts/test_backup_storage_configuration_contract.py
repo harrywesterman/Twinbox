@@ -53,7 +53,10 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert "source_raw" not in tofu
     assert "user_data_file_id" not in tofu
     assert 'content_type = "import"' in tofu
+    assert "overwrite_unmanaged = true" in tofu
     assert "var.cloud_init_iso_path" in tofu
+    assert "overwrite  = true" in tofu
+    assert "depends_on = [proxmox_virtual_environment_download_file.ubuntu]" in tofu
     assert "cdrom {" in tofu
     assert "boot_order" in tofu
     assert "-volid cidata" in script

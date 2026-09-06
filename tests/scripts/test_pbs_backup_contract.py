@@ -44,5 +44,8 @@ def test_pbs_vm_has_required_resources_and_no_fixed_network_defaults():
     assert 'content_type = "import"' in module
     assert 'content_type = "snippets"' not in module
     assert "cloud_init_iso_path" in module
+    assert "overwrite_unmanaged = true" in module
+    assert "overwrite  = true" in module
+    assert "depends_on = [proxmox_virtual_environment_download_file.debian]" in module
     assert 'address = "${var.ip_address}/${var.prefix_length}"' in module
     assert "default" not in variables

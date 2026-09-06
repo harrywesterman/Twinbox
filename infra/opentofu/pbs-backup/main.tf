@@ -4,6 +4,7 @@ resource "proxmox_virtual_environment_download_file" "debian" {
   node_name    = var.node_name
   file_name    = "debian-13-genericcloud-amd64.qcow2"
   url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+  overwrite_unmanaged = true
 }
 
 resource "proxmox_virtual_environment_file" "cloud_init" {
@@ -14,6 +15,8 @@ resource "proxmox_virtual_environment_file" "cloud_init" {
     path      = var.cloud_init_iso_path
     file_name = "${var.vm_name}-cidata.iso"
   }
+  overwrite  = true
+  depends_on = [proxmox_virtual_environment_download_file.debian]
 }
 
 resource "proxmox_virtual_environment_vm" "pbs" {
