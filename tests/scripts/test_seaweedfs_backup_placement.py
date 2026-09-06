@@ -43,6 +43,7 @@ def test_seaweedfs_runner_placement_and_ip_race(tmp_path, scenario):
 case "$*" in
   *access/ticket*) echo '{"data":{"ticket":"test","CSRFPreventionToken":"test"}}';;
   *'resources?type=node'*) echo '{"data":[{"node":"chosen","status":"online","maxmem":17179869184,"mem":0}]}';;
+  *'/cluster/status'*) echo '{"data":[{"type":"node","name":"chosen","ip":"192.0.2.10"}]}';;
   *'resources?type=vm'*) echo '{"data":[]}';;
   */storage*) echo '{"data":[{"storage":"disk","content":"images","active":1,"avail":1073741824000},{"storage":"files","content":"iso,import,snippets","active":1,"avail":10737418240}]}';;
   */network*) echo '{"data":[{"iface":"vmbr-test","active":1}]}';;

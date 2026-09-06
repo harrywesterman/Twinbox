@@ -28,6 +28,8 @@ def test_pbs_step_and_runner_contract():
     assert "qemu-server.conf.blob" in runner
     assert "user delete-token pve@pbs twinbox" in runner
     assert "Refusing to resize the existing PBS cache disk implicitly" in runner
+    assert 'select(.type == "node" and .name == $node)' in runner
+    assert 'TF_VAR_proxmox_endpoint="https://${node_ip}:${PROXMOX_PORT:-8006}"' in runner
     cloud_init = runner.split('cat >"$cloud_init" <<EOF', 1)[1].split("\nEOF", 1)[0]
     assert "pbs_admin_password" not in cloud_init
 

@@ -64,11 +64,14 @@ ticket="$(jq -r '.data.ticket // empty' <<<"$auth")"
 csrf="$(jq -r '.data.CSRFPreventionToken // empty' <<<"$auth")"
 [[ -n "$ticket" && -n "$csrf" ]] || fail "Proxmox authentication failed"
 nodes="$(curl -ksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/cluster/resources?type=node")"
+cluster_status="$(curl -ksS -H "Cookie: PVEAuthCookie=${ticket}" "${api}/cluster/status")"
 node_name="$(jq -r '.vm.node // empty' "$profile_file" 2>/dev/null || true)"
 [[ -z "$node_name" || -z "$requested_node" || "$node_name" == "$requested_node" ]] || fail "Refusing to move the existing SeaweedFS VM host"
 [[ -n "$node_name" ]] || node_name="$requested_node"
 [[ -n "$node_name" ]] || fail "Select a SeaweedFS Proxmox host in backup storage first"
 encoded_node="$(jq -rn --arg node "$node_name" '$node|@uri')"
+node_ip="$(jq -r --arg node "$node_name" '.data[]? | select(.type == "node" and .name == $node) | .ip // empty' <<<"$cluster_status")"
+[[ -n "$node_ip" ]] || fail "Unable to resolve the selected SeaweedFS Proxmox host address"
 # A saved allocation from a failed apply is not an existing VM.
 vm_exists=false
 if [[ -n "$existing_vm_id" ]]; then
@@ -172,7 +175,7 @@ jq -n --arg address "${ip_address}/${prefix_length}" --arg gateway "$gateway" --
   '{version:2,ethernets:{primary:{match:{name:"en*"},dhcp4:false,addresses:[$address],routes:[{to:"default",via:$gateway}],nameservers:{addresses:$dns}}}}' >"${seed_dir}/network-config"
 xorriso -as mkisofs -output "${secret_dir}/cidata.iso" -volid cidata -joliet -rock \
   "${seed_dir}/user-data" "${seed_dir}/meta-data" "${seed_dir}/network-config" >/dev/null 2>&1
-export TF_VAR_proxmox_endpoint="https://${PROXMOX_HOST}:${PROXMOX_PORT:-8006}"
+export TF_VAR_proxmox_endpoint="https://${node_ip}:${PROXMOX_PORT:-8006}"
 export TF_VAR_proxmox_username="$PROXMOX_USER" TF_VAR_proxmox_password="$PROXMOX_PASSWORD"
 export TF_VAR_node_name="$node_name" TF_VAR_vm_id="$vm_id" TF_VAR_vm_name="${cluster_slug}-backup-s3"
 export TF_VAR_datastore_id="$datastore" TF_VAR_file_datastore_id="$file_datastore" TF_VAR_bridge="$bridge"

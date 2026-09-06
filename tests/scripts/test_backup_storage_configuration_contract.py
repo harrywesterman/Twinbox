@@ -64,6 +64,8 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert "sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx" in script
     assert '"set -e; sudo install' in script
     assert 'if [[ "$vm_exists" == false ]]; then' in script
+    assert 'select(.type == "node" and .name == $node)' in script
+    assert 'TF_VAR_proxmox_endpoint="https://${node_ip}:${PROXMOX_PORT:-8006}"' in script
 
     assert "secrets/cluster/${TWINBOX_CLUSTER_ID}/backup-storage" in script
     assert ".vm.vm_id // empty" in script
