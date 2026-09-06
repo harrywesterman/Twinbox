@@ -87,7 +87,7 @@ existing_node_name="$(jq -r '.node // empty' "$pbs_profile" 2>/dev/null || true)
 vm_id="$(jq -r '.vm_id // empty' "$pbs_profile" 2>/dev/null || true)"
 [[ -n "$vm_id" ]] || vm_id="$(pve_get '/cluster/nextid' | jq -r '.data//empty')"
 [[ "$vm_id" =~ ^[0-9]+$ && -n "$node_name" ]] || fail "Could not select a PBS VMID and node"
-node_status="$(pve_get "/nodes/${node_name}/status" | jq -r '.data.status // empty')"
+node_status="$(pve_get '/cluster/resources?type=node' | jq -r --arg node "$node_name" '.data[]? | select(.node == $node) | .status // empty')"
 [[ "$node_status" == "online" ]] || fail "Selected PBS host ${node_name} is not online"
 node_ip="$(pve_get '/cluster/status' | jq -r --arg node "$node_name" '.data[]? | select(.type == "node" and .name == $node) | .ip // empty')"
 [[ -n "$node_ip" ]] || fail "Unable to resolve the selected PBS Proxmox host address"
