@@ -32,6 +32,12 @@ def test_pbs_step_and_runner_contract():
     assert "pve_get '/cluster/resources?type=node'" in runner
     assert "select(.node == $node) | .status // empty" in runner
     assert "'.data.status // empty'" not in runner
+    assert "disk=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1" in runner
+    assert "test -b /dev/sdb" not in runner
+    assert 'wipefs -n --noheadings -o TYPE "$disk"' in runner
+    assert 'lsblk -nr -o TYPE "$disk"' in runner
+    assert "UUID=%s %s ext4 defaults,nofail" in runner
+    assert 'findmnt -nr -o UUID --target "$mountpoint"' in runner
     assert 'TF_VAR_proxmox_endpoint="https://${node_ip}:${PROXMOX_PORT:-8006}"' in runner
     cloud_init = runner.split('cat >"$cloud_init" <<EOF', 1)[1].split("\nEOF", 1)[0]
     assert "pbs_admin_password" not in cloud_init

@@ -174,7 +174,31 @@ endpoint_no_scheme="${endpoint#https://}"; endpoint_hostport="${endpoint_no_sche
 s3_create=(sudo proxmox-backup-manager s3 endpoint create twinbox-s3 --access-key "$access_key" --secret-key "$secret_key" --endpoint "$endpoint_host" --port "$endpoint_port" --region "$region")
 [[ "$path_style" == true ]] && s3_create+=(--path-style true)
 [[ -n "$s3_fingerprint" ]] && s3_create+=(--fingerprint "$s3_fingerprint")
-$remote 'sudo test -b /dev/sdb && (sudo blkid /dev/sdb || sudo mkfs.ext4 -F /dev/sdb); sudo mkdir -p /mnt/datastore/twinbox-s3-cache; grep -q twinbox-s3-cache /etc/fstab || echo "/dev/sdb /mnt/datastore/twinbox-s3-cache ext4 defaults,nofail 0 2" | sudo tee -a /etc/fstab >/dev/null; sudo mount -a'
+ssh "${ssh_opts[@]}" "twinbox@${ip_address}" 'sudo bash -s' <<'CACHE'
+set -euo pipefail
+disk=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
+mountpoint=/mnt/datastore/twinbox-s3-cache
+test -b "$disk"
+# Refuse partitioned disks and mounted filesystems, including a system disk.
+[[ "$(lsblk -nr -o TYPE "$disk" | wc -l)" -eq 1 ]]
+fstype="$(blkid -s TYPE -o value "$disk" || true)"
+if [[ -z "$fstype" ]]; then
+  [[ -z "$(wipefs -n --noheadings -o TYPE "$disk")" ]]
+  [[ -z "$(lsblk -nr -o MOUNTPOINTS "$disk" | tr -d '[:space:]')" ]]
+  mkfs.ext4 "$disk"
+else
+  [[ "$fstype" == ext4 ]]
+fi
+uuid="$(blkid -s UUID -o value "$disk")"
+test -n "$uuid"
+mkdir -p "$mountpoint"
+awk -v target="$mountpoint" '$2 != target' /etc/fstab > /etc/fstab.twinbox-pbs
+printf 'UUID=%s %s ext4 defaults,nofail 0 2\n' "$uuid" "$mountpoint" >> /etc/fstab.twinbox-pbs
+cat /etc/fstab.twinbox-pbs > /etc/fstab
+rm /etc/fstab.twinbox-pbs
+mountpoint -q "$mountpoint" || mount "$mountpoint"
+[[ "$(findmnt -nr -o UUID --target "$mountpoint")" == "$uuid" ]]
+CACHE
 if $remote 'sudo proxmox-backup-manager s3 endpoint show twinbox-s3 >/dev/null 2>&1'; then
   s3_update=(sudo proxmox-backup-manager s3 endpoint update twinbox-s3 --access-key "$access_key" --secret-key "$secret_key" --endpoint "$endpoint_host" --port "$endpoint_port" --region "$region")
   [[ "$path_style" == true ]] && s3_update+=(--path-style true)
