@@ -32,6 +32,11 @@ def test_pbs_step_and_runner_contract():
     assert "keep-weekly=8" in runner
     assert "keep-monthly=12" in runner
     assert "exclude_vmids" in runner
+    assert ".nodes[]?.vm_id" not in runner
+    assert ".controlplane_vm_ids[]?" in runner
+    assert ".worker_vm_ids[]?" in runner
+    assert "sort_vmids" in runner
+    assert "Reconciling PBS backup job" in runner
     assert "MANAGEMENT_VM_ID" in runner
     assert "restore-read-test" in runner
     assert "qemu-server.conf.blob" in runner

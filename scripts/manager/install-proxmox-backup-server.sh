@@ -257,7 +257,7 @@ fi
 resources="$(pve_get '/cluster/resources?type=vm')"
 exclude_vmids="${vm_id}"
 seaweed_vmid="$(jq -r '.vm.vm_id // empty' "$backup_profile")"; [[ -z "$seaweed_vmid" ]] || exclude_vmids+=",${seaweed_vmid}"
-talos_vmids="$(jq -r '[.nodes[]?.vm_id]|map(select(. != null))|join(",")' <<<"$cluster_json")"
+talos_vmids="$(jq -r '[.controlplane_vm_ids[]?, .worker_vm_ids[]?] | map(select(. != null)) | join(",")' <<<"$cluster_json")"
 management_vmid="${MANAGEMENT_VM_ID:-}"
 [[ "$management_vmid" =~ ^[0-9]+$ ]] || fail "MANAGEMENT_VM_ID is required for the PBS backup job"
 include_vmids="$(printf '%s,%s' "$management_vmid" "$talos_vmids" | sed -E 's/,+/,/g;s/^,|,$//g')"
@@ -265,8 +265,17 @@ for excluded in ${exclude_vmids//,/ }; do include_vmids="$(printf '%s' "$include
 [[ -n "$include_vmids" ]] || fail "No Management or Talos VMs found for the PBS backup job"
 job_id="twinbox-${cluster_slug}-daily"
 jobs="$(pve_get '/cluster/backup')"
-if ! jq -e --arg id "$job_id" '.data|any(.id==$id)' <<<"$jobs" >/dev/null; then
+sort_vmids() { printf '%s' "$1" | tr ',' '\n' | sed '/^$/d' | sort -n | paste -sd, -; }
+existing_job_vmid="$(jq -r --arg id "$job_id" '.data[]? | select(.id==$id) | .vmid // empty' <<<"$jobs")"
+if [[ -z "$existing_job_vmid" ]]; then
   pve_post '/cluster/backup' --data-urlencode "id=${job_id}" --data-urlencode "storage=${storage_id}" --data-urlencode "vmid=${include_vmids}" --data-urlencode 'schedule=02:30' --data-urlencode 'mode=snapshot' --data-urlencode 'enabled=1' --data-urlencode 'prune-backups=keep-daily=14,keep-weekly=8,keep-monthly=12' >/dev/null
+else
+  existing_sorted="$(sort_vmids "$existing_job_vmid")"
+  include_sorted="$(sort_vmids "$include_vmids")"
+  if [[ "$existing_sorted" != "$include_sorted" ]]; then
+    log "Reconciling PBS backup job ${job_id} vmid list (was ${existing_job_vmid}, now ${include_vmids})"
+    pve_put "/cluster/backup/${job_id}" --data-urlencode "vmid=${include_vmids}" >/dev/null
+  fi
 fi
 first_vmid="${include_vmids%%,*}"; first_node="$(jq -r --argjson id "$first_vmid" '.data[]|select(.vmid==$id)|.node' <<<"$resources")"
 backup_result="$(pve_post "/nodes/${first_node}/vzdump" --data-urlencode "vmid=${first_vmid}" --data-urlencode "storage=${storage_id}" --data-urlencode 'mode=snapshot')"
