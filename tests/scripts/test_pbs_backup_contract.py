@@ -22,6 +22,9 @@ def test_pbs_step_and_runner_contract():
     assert '--backend "type=s3,client=' in runner
     assert "DatastoreBackup" in runner
     assert "--auth-id pve@pbs!twinbox" in runner
+    assert "--auth-id pve@pbs'" in runner
+    assert "datastore update twinbox-s3 --backend" not in runner
+    assert "Existing PBS datastore does not match the configured cache and S3 backend" in runner
     assert "keep-daily=14" in runner
     assert "keep-weekly=8" in runner
     assert "keep-monthly=12" in runner

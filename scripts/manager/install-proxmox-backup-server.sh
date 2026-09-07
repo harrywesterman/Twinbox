@@ -210,7 +210,11 @@ else
   ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "${s3_create[@]}"
 fi
 if $remote 'sudo proxmox-backup-manager datastore show twinbox-s3 >/dev/null 2>&1'; then
-  ssh "${ssh_opts[@]}" "twinbox@${ip_address}" sudo proxmox-backup-manager datastore update twinbox-s3 --backend "type=s3,client=twinbox-s3,bucket=${bucket}"
+  existing_store="$(ssh "${ssh_opts[@]}" "twinbox@${ip_address}" sudo proxmox-backup-manager datastore show twinbox-s3 --output-format json)"
+  jq -e --arg bucket "$bucket" '.path == "/mnt/datastore/twinbox-s3-cache" and
+    (.backend | split(",") | map(split("=") | {key: .[0], value: .[1]}) | from_entries |
+      .type == "s3" and .client == "twinbox-s3" and .bucket == $bucket)' <<<"$existing_store" >/dev/null ||
+    fail "Existing PBS datastore does not match the configured cache and S3 backend"
 else
   ssh "${ssh_opts[@]}" "twinbox@${ip_address}" sudo proxmox-backup-manager datastore create twinbox-s3 /mnt/datastore/twinbox-s3-cache --backend "type=s3,client=twinbox-s3,bucket=${bucket}"
 fi
@@ -228,6 +232,7 @@ fi
 [[ -n "$token_value" ]] || fail "Could not create or recover PBS API token"
 jq --arg token_value "$token_value" '.token_value=$token_value | .status="configuring"' "$pbs_profile" >"${pbs_profile}.tmp"
 mv "${pbs_profile}.tmp" "$pbs_profile"; chmod 0600 "$pbs_profile"
+$remote 'sudo proxmox-backup-manager acl update /datastore/twinbox-s3 DatastoreBackup --auth-id pve@pbs'
 $remote 'sudo proxmox-backup-manager acl update /datastore/twinbox-s3 DatastoreBackup --auth-id pve@pbs!twinbox'
 pbs_fingerprint="$($remote "sudo proxmox-backup-manager cert info | sed -n 's/^Fingerprint (sha256): //p'" | head -1)"
 [[ -n "$pbs_fingerprint" ]] || fail "Could not read PBS certificate fingerprint"
