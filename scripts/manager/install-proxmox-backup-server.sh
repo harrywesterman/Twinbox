@@ -143,7 +143,7 @@ runcmd:
   - echo 'deb http://download.proxmox.com/debian/pbs trixie pbs-no-subscription' > /etc/apt/sources.list.d/pbs.list
   - curl -fsSL https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg -o /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
   - apt-get update
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y proxmox-backup-server
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y proxmox-backup-server proxmox-backup-client
   - touch /run/twinbox-pbs-installed
 EOF
 dns_json="$(jq -cn --arg csv "$dns_csv" '$csv|split(",")|map(gsub("^\\s+|\\s+$";""))')"
@@ -163,6 +163,17 @@ for attempt in $(seq 1 90); do
   log "Waiting for PBS package installation (attempt ${attempt}/90)"
   sleep 10
 done
+ssh "${ssh_opts[@]}" "twinbox@${ip_address}" 'sudo bash -s' <<'CLIENT'
+set -euo pipefail
+# The server package enables an enterprise source; this VM uses no-subscription.
+if [[ -f /etc/apt/sources.list.d/pbs-enterprise.sources ]]; then
+  mv /etc/apt/sources.list.d/pbs-enterprise.sources /etc/apt/sources.list.d/pbs-enterprise.sources.disabled
+fi
+if ! command -v proxmox-backup-client >/dev/null; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y proxmox-backup-client
+fi
+CLIENT
 password_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-pbs-password-XXXXXX")"
 trap 'rm -f "$cloud_init" "$password_file"' EXIT
 printf 'root:%s\n' "$pbs_admin_password" >"$password_file"; chmod 0600 "$password_file"
@@ -221,11 +232,11 @@ fi
 $remote 'sudo proxmox-backup-manager user list --output-format json | jq -e '\''map(select(.userid=="pve@pbs"))|length==1'\'' >/dev/null' || $remote 'sudo proxmox-backup-manager user create pve@pbs'
 token_value="$existing_token_value"
 if [[ -z "$token_value" ]]; then
-  token_json="$($remote 'sudo proxmox-backup-manager user generate-token pve@pbs twinbox --output-format json' 2>/dev/null || true)"
+  token_json="$($remote 'sudo proxmox-backup-manager user generate-token pve@pbs twinbox' 2>/dev/null | sed '1s/^Result: //' || true)"
   token_value="$(jq -r '.value // empty' <<<"$token_json")"
   if [[ -z "$token_value" ]]; then
     $remote 'sudo proxmox-backup-manager user delete-token pve@pbs twinbox >/dev/null 2>&1 || true'
-    token_json="$($remote 'sudo proxmox-backup-manager user generate-token pve@pbs twinbox --output-format json')"
+    token_json="$($remote 'sudo proxmox-backup-manager user generate-token pve@pbs twinbox' | sed '1s/^Result: //')"
     token_value="$(jq -r '.value // empty' <<<"$token_json")"
   fi
 fi
@@ -262,10 +273,10 @@ backup_result="$(pve_post "/nodes/${first_node}/vzdump" --data-urlencode "vmid=$
 upid="$(jq -r '.data//empty' <<<"$backup_result")"; [[ -n "$upid" ]] || fail "Could not start PBS verification backup"
 encoded_upid="$(jq -rn --arg v "$upid" '$v|@uri')"
 for attempt in $(seq 1 180); do status="$(pve_get "/nodes/${first_node}/tasks/${encoded_upid}/status")"; state="$(jq -r '.data.status//empty' <<<"$status")"; [[ "$state" != stopped ]] || { [[ "$(jq -r '.data.exitstatus' <<<"$status")" == OK ]] || fail "PBS verification backup failed"; break; }; [[ "$attempt" -lt 180 ]] || fail "PBS verification backup timed out"; sleep 10; done
-snapshot_json="$(ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client snapshot list --repository 'pve@pbs!twinbox@localhost:twinbox-s3' --output-format json")"
+snapshot_json="$(ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "PBS_FINGERPRINT='${pbs_fingerprint}' PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client snapshot list --repository 'pve@pbs!twinbox@localhost:twinbox-s3' --output-format json")"
 latest_snapshot="$(jq -r --arg vmid "$first_vmid" '[.[]|select(.["backup-type"]=="vm" and (.["backup-id"]|tostring)==$vmid)]|sort_by(.["backup-time"])|last|"vm/\(.["backup-id"])/\(.["backup-time"]|strftime("%Y-%m-%dT%H:%M:%SZ"))"' <<<"$snapshot_json")"
 [[ -n "$latest_snapshot" && "$latest_snapshot" != null ]] || fail "PBS restore-read-test could not find the verification snapshot"
-ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "tmp=\$(mktemp); trap 'rm -f \"\$tmp\"' EXIT; PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client restore '${latest_snapshot}' qemu-server.conf.blob \"\$tmp\" --repository 'pve@pbs!twinbox@localhost:twinbox-s3' >/dev/null; test -s \"\$tmp\"" || fail "PBS restore-read-test failed"
+ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "tmp=\$(mktemp); trap 'rm -f \"\$tmp\"' EXIT; PBS_FINGERPRINT='${pbs_fingerprint}' PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client restore '${latest_snapshot}' qemu-server.conf.blob \"\$tmp\" --repository 'pve@pbs!twinbox@localhost:twinbox-s3' >/dev/null; test -s \"\$tmp\"" || fail "PBS restore-read-test failed"
 
 jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --arg cache_datastore "$cache_datastore" --argjson cpu "$cpu" --argjson memory_gb "$memory_gb" --argjson system_disk_gb "$system_disk_gb" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg fingerprint "$pbs_fingerprint" --arg token_value "$token_value" --arg admin_password "$pbs_admin_password" --arg storage_id "$storage_id" --arg exclude_vmids "$exclude_vmids" \
   '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_datastore:$cache_datastore,cpu:$cpu,memory_gb:$memory_gb,system_disk_gb:$system_disk_gb,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,fingerprint:$fingerprint,token_value:$token_value,admin_password:$admin_password,pve_storage_id:$storage_id,exclude_vmids:$exclude_vmids,status:"ready",verification:"backup-and-restore-read-test"}' >"$pbs_profile"

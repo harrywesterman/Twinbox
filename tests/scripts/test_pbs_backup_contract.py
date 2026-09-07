@@ -33,6 +33,12 @@ def test_pbs_step_and_runner_contract():
     assert "restore-read-test" in runner
     assert "qemu-server.conf.blob" in runner
     assert "user delete-token pve@pbs twinbox" in runner
+    assert "generate-token pve@pbs twinbox --output-format" not in runner
+    assert "sed '1s/^Result: //'" in runner
+    assert "apt-get install -y proxmox-backup-server proxmox-backup-client" in runner
+    assert "command -v proxmox-backup-client" in runner
+    assert "pbs-enterprise.sources.disabled" in runner
+    assert runner.count("PBS_FINGERPRINT='${pbs_fingerprint}'") == 2
     assert "Refusing to resize the existing PBS cache disk implicitly" in runner
     assert 'select(.type == "node" and .name == $node)' in runner
     assert "pve_get '/cluster/resources?type=node'" in runner
