@@ -32,7 +32,7 @@ PBS_APP_MANIFEST_PATH="${PBS_APP_MANIFEST_PATH:-$WORKSPACE_ROOT/gitops/apps/pbs.
 PBS_PLATFORM_DIR="${PBS_PLATFORM_DIR:-$WORKSPACE_ROOT/gitops/platform-apps/pbs}"
 PBS_NAMESPACE="${PBS_NAMESPACE:-pbs}"
 PBS_APPLICATION_SLUG="${PBS_APPLICATION_SLUG:-pbs}"
-PBS_REALM="${PBS_REALM:-pbs}"
+PBS_REALM="${PBS_REALM:-openid}"
 
 resolve_kubeconfig_file() {
   local candidate=""
