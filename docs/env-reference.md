@@ -26,7 +26,7 @@ Complete reference for the `.env` file used by the Twinbox manager stack.
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `TWINBOX_IMAGE_TAG` | `sha-ff54a9f` | GHCR image tag for all three manager services |
+| `TWINBOX_IMAGE_TAG` | `sha-acce52b` | GHCR image tag for all three manager services |
 
 ## Pinned Tool Versions
 
