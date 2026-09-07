@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: backup-s3
+  namespace: backup-s3
+subsets:
+  - addresses:
+      - ip: __BACKUP_S3_HOST_IP__
+    ports:
+      - name: https
+        port: 8443
+        protocol: TCP

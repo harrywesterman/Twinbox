@@ -1,0 +1,7 @@
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: backup-s3-server-transport
+  namespace: backup-s3
+spec:
+  insecureSkipVerify: true

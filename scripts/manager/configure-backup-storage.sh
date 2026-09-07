@@ -27,7 +27,7 @@ configured_mode="$(jq -r '.mode // empty' "$profile_file" 2>/dev/null || true)"
 
 if [[ "$mode" == "managed-seaweedfs" ]]; then
   bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/provision-seaweedfs-backup-vm.sh"
-  TWINBOX_CLUSTER_ID="$cluster_id" bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/configure-seaweedfs-admin.sh"
+  TWINBOX_CLUSTER_ID="$cluster_id" TWINBOX_CLUSTER_SLUG="$cluster_slug" bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/configure-seaweedfs-admin.sh"
   profile_file="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/cluster/${cluster_id}/backup-storage/metadata.json"
   endpoint="$(jq -r '.endpoint' "$profile_file")"
   region="$(jq -r '.region' "$profile_file")"

@@ -116,6 +116,12 @@ secrets:
       scope: global
       item: proxmox
       field: password
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/configure-backup-storage/run.sh

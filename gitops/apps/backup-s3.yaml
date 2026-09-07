@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backup-s3
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __TARGET_REVISION__
+    path: gitops/platform-apps/backup-s3
+    kustomize:
+      patches:
+        - target:
+            kind: IngressRoute
+            name: backup-s3
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`backup-s3.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: backup-s3-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`backup-s3.__ZONE_NAME__`)
+        - target:
+            kind: IngressRoute
+            name: backup-s3-authentik-callback
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`backup-s3.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+        - target:
+            kind: IngressRoute
+            name: backup-s3-authentik-callback-netbird
+          patch: |-
+            - op: replace
+              path: /spec/routes/0/match
+              value: Host(`backup-s3.__ZONE_NAME__`) && PathPrefix(`/outpost.goauthentik.io`)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: backup-s3
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

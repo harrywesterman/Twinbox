@@ -2,8 +2,14 @@
 set -euo pipefail
 
 : "${TWINBOX_CLUSTER_ID:?cluster id required}"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1091
+source "$WORKSPACE_ROOT/scripts/manager/cluster-public-zone.sh"
 profile="${TWINBOX_BOOTSTRAP_DIR:-/opt/twinbox/bootstrap}/secrets/cluster/${TWINBOX_CLUSTER_ID}/backup-storage/metadata.json"
 [[ "$(jq -r '.mode' "$profile")" == managed-seaweedfs ]] || exit 0
+cluster_slug="$(printf '%s' "${TWINBOX_CLUSTER_SLUG:-$TWINBOX_CLUSTER_ID}" | tr '[:upper:]_' '[:lower:]-' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+|-+$//g')"
+cluster_dns_domain="$(jq -r '.cluster.dns_domain // empty' <<<"${STEP_CONTEXT_JSON:-}")"
+public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain" 2>/dev/null || true)"
 ip="$(jq -er '.vm.ip_address' "$profile")"
 key="$(jq -er '.vm.ssh_private_key' "$profile")"
 credentials="$(dirname "$profile")/admin.json"
@@ -55,6 +61,15 @@ for attempt in $(seq 1 30); do
 done
 exit 1
 REMOTE
-jq --arg url "https://${ip}:8443" '.admin = {url:$url}' "$profile" >"$tmp/profile.json"
-mv "$tmp/profile.json" "$profile"
+if [[ -n "$public_zone_name" ]]; then
+  jq --arg url "https://backup-s3.${public_zone_name}" '.admin = {url:$url}' "$profile" >"$tmp/profile.json"
+  mv "$tmp/profile.json" "$profile"
+else
+  jq --arg url "https://${ip}:8443" '.admin = {url:$url}' "$profile" >"$tmp/profile.json"
+  mv "$tmp/profile.json" "$profile"
+fi
 echo 'SeaweedFS admin configured; login credentials saved beside the backup profile in admin.json'
+if [[ -n "$public_zone_name" ]]; then
+  BACKUP_S3_PROFILE="$profile" TWINBOX_CLUSTER_SLUG="$cluster_slug" \
+    bash "$WORKSPACE_ROOT/scripts/manager/configure-backup-s3-publication.sh"
+fi
