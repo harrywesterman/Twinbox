@@ -66,7 +66,21 @@ find_oauth2_provider_pk_by_name() {
 
 find_application_json_by_slug() {
   local application_slug="$1"
-  authentik_api_get "/core/applications/${application_slug}/" 2>/dev/null || true
+  local tmp_file http_status
+
+  tmp_file="$(mktemp)"
+  http_status="$(
+    curl -sS \
+      -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+      -H "Accept: application/json" \
+      -o "$tmp_file" \
+      -w '%{http_code}' \
+      "${AUTHENTIK_API_BASE}/core/applications/${application_slug}/" 2>/dev/null || true
+  )"
+  if [[ "$http_status" =~ ^2 ]]; then
+    cat "$tmp_file"
+  fi
+  rm -f "$tmp_file"
 }
 
 find_policy_binding_pk() {

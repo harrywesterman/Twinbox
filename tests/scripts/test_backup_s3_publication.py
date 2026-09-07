@@ -48,6 +48,8 @@ def test_publication_helper_contract():
     assert "AUTHENTIK_RESOURCE_ID" in helper
     assert "$(create_or_update_proxy_provider" not in helper
     assert "$(create_or_update_application" not in helper
+    assert 'authentik_api_get "/core/applications/' not in helper
+    assert "curl" in helper.split("find_application_json_by_slug", 1)[1].split("}", 1)[0]
 
 
 def test_publication_helper_skips_without_kubeconfig_or_authentik():
