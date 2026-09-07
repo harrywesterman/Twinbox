@@ -157,7 +157,7 @@ write_files:
   - path: /etc/nginx/sites-available/default
     defer: true
     content: |
-      server { listen 443 ssl; ssl_certificate /etc/nginx/twinbox-server.crt; ssl_certificate_key /etc/nginx/twinbox-server.key; location / { proxy_pass http://127.0.0.1:8333; proxy_set_header Host \$host; } }
+      server { listen 443 ssl; client_max_body_size 0; ssl_certificate /etc/nginx/twinbox-server.crt; ssl_certificate_key /etc/nginx/twinbox-server.key; location / { proxy_pass http://127.0.0.1:8333; proxy_set_header Host \$http_host; } }
 runcmd:
   - systemctl enable --now qemu-guest-agent docker
   - 'test -b /dev/sdb && (blkid /dev/sdb || mkfs.ext4 -F /dev/sdb)'

@@ -16,6 +16,9 @@ def test_pbs_step_and_runner_contract():
     assert "pbs_cpu" in step and "pbs_memory_gb" in step and "pbs_system_disk_gb" in step
     assert "buckets.pbs" in runner
     assert "s3 endpoint create" in runner
+    assert "s3 endpoint list --output-format json" in runner
+    assert "s3 endpoint show" not in runner
+    assert 'any(.[]; .id == "twinbox-s3")' in runner
     assert '--backend "type=s3,client=' in runner
     assert "DatastoreBackup" in runner
     assert "--auth-id pve@pbs!twinbox" in runner
@@ -34,7 +37,8 @@ def test_pbs_step_and_runner_contract():
     assert "'.data.status // empty'" not in runner
     assert "disk=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1" in runner
     assert "test -b /dev/sdb" not in runner
-    assert 'wipefs -n --noheadings -o TYPE "$disk"' in runner
+    assert 'signatures="$(wipefs --no-act --noheadings --output TYPE "$disk")"' in runner
+    assert '[[ -z "$signatures" ]]' in runner
     assert 'lsblk -nr -o TYPE "$disk"' in runner
     assert "UUID=%s %s ext4 defaults,nofail" in runner
     assert 'findmnt -nr -o UUID --target "$mountpoint"' in runner

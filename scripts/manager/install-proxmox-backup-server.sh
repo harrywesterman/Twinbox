@@ -183,7 +183,8 @@ test -b "$disk"
 [[ "$(lsblk -nr -o TYPE "$disk" | wc -l)" -eq 1 ]]
 fstype="$(blkid -s TYPE -o value "$disk" || true)"
 if [[ -z "$fstype" ]]; then
-  [[ -z "$(wipefs -n --noheadings -o TYPE "$disk")" ]]
+  signatures="$(wipefs --no-act --noheadings --output TYPE "$disk")"
+  [[ -z "$signatures" ]]
   [[ -z "$(lsblk -nr -o MOUNTPOINTS "$disk" | tr -d '[:space:]')" ]]
   mkfs.ext4 "$disk"
 else
@@ -199,7 +200,8 @@ rm /etc/fstab.twinbox-pbs
 mountpoint -q "$mountpoint" || mount "$mountpoint"
 [[ "$(findmnt -nr -o UUID --target "$mountpoint")" == "$uuid" ]]
 CACHE
-if $remote 'sudo proxmox-backup-manager s3 endpoint show twinbox-s3 >/dev/null 2>&1'; then
+s3_endpoints="$(ssh "${ssh_opts[@]}" "twinbox@${ip_address}" sudo proxmox-backup-manager s3 endpoint list --output-format json)"
+if jq -e 'any(.[]; .id == "twinbox-s3")' <<<"$s3_endpoints" >/dev/null; then
   s3_update=(sudo proxmox-backup-manager s3 endpoint update twinbox-s3 --access-key "$access_key" --secret-key "$secret_key" --endpoint "$endpoint_host" --port "$endpoint_port" --region "$region")
   [[ "$path_style" == true ]] && s3_update+=(--path-style true)
   [[ -n "$s3_fingerprint" ]] && s3_update+=(--fingerprint "$s3_fingerprint")

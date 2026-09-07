@@ -66,6 +66,9 @@ def test_managed_seaweedfs_vm_is_idempotent_and_keeps_sensitive_state_in_secret_
     assert "-volid cidata" in script
     assert "defer: true" in script
     assert "sudo nginx -t; sudo systemctl enable nginx; sudo systemctl restart nginx" in script
+    assert r"proxy_set_header Host \$http_host;" in script
+    assert r"proxy_set_header Host \$host;" not in script
+    assert "client_max_body_size 0;" in script
     assert '"set -e; sudo install' in script
     assert 'if [[ "$vm_exists" == false ]]; then' in script
     assert 'select(.type == "node" and .name == $node)' in script
