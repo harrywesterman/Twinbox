@@ -20,7 +20,10 @@ if [[ ! -s "$credentials" ]]; then
 fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-jq -r '"WEED_ADMIN_USER=" + .username, "WEED_ADMIN_PASSWORD=" + .password' "$credentials" >"$tmp/admin.env"
+# Local `weed admin` auth stays disabled so Authentik forward-auth is the single
+# gate (matching the in-cluster s3-admin console). admin.json is kept as a record
+# of the original credentials in case local auth is ever re-enabled.
+jq -r '"WEED_ADMIN_USER=" + .username' "$credentials" >"$tmp/admin.env"
 opts=(-i "$key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
 scp "${opts[@]}" "$tmp/admin.env" "twinbox@${ip}:/tmp/twinbox-admin.env" >/dev/null
 ssh "${opts[@]}" "twinbox@${ip}" 'sudo bash -s' <<'REMOTE'
@@ -68,7 +71,7 @@ else
   jq --arg url "https://${ip}:8443" '.admin = {url:$url}' "$profile" >"$tmp/profile.json"
   mv "$tmp/profile.json" "$profile"
 fi
-echo 'SeaweedFS admin configured; login credentials saved beside the backup profile in admin.json'
+echo 'SeaweedFS admin configured; local auth disabled (Authentik forward-auth gates access)'
 if [[ -n "$public_zone_name" ]]; then
   BACKUP_S3_PROFILE="$profile" TWINBOX_CLUSTER_SLUG="$cluster_slug" \
     bash "$WORKSPACE_ROOT/scripts/manager/configure-backup-s3-publication.sh"

@@ -46,3 +46,11 @@ def test_admin_reconciliation_preserves_credentials_and_uses_guest_address(tmp_p
     assert "twinbox@backup.example.test" in calls
     assert "/test/guest-key" in calls
     assert json.loads(credentials)["password"] not in calls
+
+
+def test_admin_script_disables_local_auth_for_authentik_sso():
+    script = (ROOT / "scripts/manager/configure-seaweedfs-admin.sh").read_text()
+    assert '"WEED_ADMIN_USER=" + .username' in script
+    assert "WEED_ADMIN_PASSWORD=" not in script
+    assert "auth stays disabled" in script
+    assert "Authentik forward-auth gates access" in script
