@@ -296,6 +296,11 @@ if [[ -z "$oidc_client_id" || -z "$oidc_client_secret" ]]; then
   oidc_client_secret="$(openssl rand -hex 24)"
 fi
 
+# PBS sends its server origin as the OIDC redirect URL. Authentik no longer
+# accepts a "prefix" matching mode, so match the host with a regex that also
+# tolerates a trailing slash or sub-path.
+pbs_redirect_regex="^$(printf '%s' "$pbs_host" | sed 's/[.]/\\&/g')(?:/.*)?$"
+
 property_mapping_ids_json="$(
   jq -cn \
     --arg openid "$openid_mapping_id" \
@@ -312,7 +317,7 @@ provider_payload="$(
     --arg authorization_flow "$authorization_flow_id" \
     --arg invalidation_flow "$invalidation_flow_id" \
     --arg signing_key "$signing_key_id" \
-    --arg redirect_uri "$pbs_host" \
+    --arg redirect_uri "$pbs_redirect_regex" \
     --argjson property_mappings "$property_mapping_ids_json" \
     '{
       name: $name,
@@ -323,7 +328,7 @@ provider_payload="$(
       signing_key: $signing_key,
       redirect_uris: [
         {
-          matching_mode: "prefix",
+          matching_mode: "regex",
           url: $redirect_uri
         }
       ],
