@@ -106,5 +106,8 @@ def test_pbs_reverse_proxy_publication_contract():
     assert "authorization_code" in helper
     assert "authentik_find_group_id" in helper
     assert "authentik_setup_forward" in helper
+    assert "AUTHENTIK_RESOURCE_ID" in helper
+    assert "$(create_or_update_oauth2_provider" not in helper
+    assert "$(create_or_update_application" not in helper
     assert "oidc_client_id" in helper
     assert "oidc_client_secret" in helper

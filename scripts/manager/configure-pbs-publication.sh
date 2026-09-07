@@ -11,7 +11,7 @@ set -euo pipefail
 #
 # Requires: kubectl, KUBECONFIG_FILE, SSH access to the PBS VM, Authentik API access.
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2; }
 fail() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; exit 1; }
 
 : "${TWINBOX_CLUSTER_ID:?missing TWINBOX_CLUSTER_ID}"
@@ -100,7 +100,7 @@ create_or_update_oauth2_provider() {
   if [[ -n "$existing_pk" ]]; then
     log "Updating Authentik OAuth2 provider for ${provider_name} (provider=${existing_pk})"
     authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
+    AUTHENTIK_RESOURCE_ID="$existing_pk"
     return 0
   fi
 
@@ -124,7 +124,7 @@ create_or_update_oauth2_provider() {
   if [[ "$http_status" =~ ^2 ]]; then
     existing_pk="$(extract_authentik_identifier "$response_json")"
     if [[ -n "$existing_pk" ]]; then
-      printf '%s\n' "$existing_pk"
+      AUTHENTIK_RESOURCE_ID="$existing_pk"
       return 0
     fi
   fi
@@ -134,7 +134,7 @@ create_or_update_oauth2_provider() {
 
   log "Recovering Authentik OAuth2 provider for ${provider_name} after create failure (provider=${existing_pk})"
   authentik_api_write PATCH "/providers/oauth2/${existing_pk}/" "$provider_payload" >/dev/null
-  printf '%s\n' "$existing_pk"
+  AUTHENTIK_RESOURCE_ID="$existing_pk"
 }
 
 create_or_update_application() {
@@ -148,7 +148,7 @@ create_or_update_application() {
   if [[ -n "$existing_pk" ]]; then
     log "Updating Authentik application for ${application_name} (application=${existing_pk})"
     authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
-    printf '%s\n' "$existing_pk"
+    AUTHENTIK_RESOURCE_ID="$existing_pk"
     return 0
   fi
 
@@ -172,7 +172,7 @@ create_or_update_application() {
   if [[ "$http_status" =~ ^2 ]]; then
     created_pk="$(extract_authentik_identifier "$response_json")"
     if [[ -n "$created_pk" ]]; then
-      printf '%s\n' "$created_pk"
+      AUTHENTIK_RESOURCE_ID="$created_pk"
       return 0
     fi
   fi
@@ -183,7 +183,7 @@ create_or_update_application() {
 
   log "Recovering Authentik application for ${application_name} after create failure (application=${existing_pk})"
   authentik_api_write PATCH "/core/applications/${application_slug}/" "$application_payload" >/dev/null
-  printf '%s\n' "$existing_pk"
+  AUTHENTIK_RESOURCE_ID="$existing_pk"
 }
 
 ensure_group_binding() {
@@ -322,7 +322,9 @@ provider_payload="$(
 )"
 
 log "Provisioning Authentik OIDC client for PBS"
-provider_pk="$(create_or_update_oauth2_provider "PBS" "$PBS_APPLICATION_SLUG" "$provider_payload")"
+AUTHENTIK_RESOURCE_ID=""
+create_or_update_oauth2_provider "PBS" "$PBS_APPLICATION_SLUG" "$provider_payload"
+provider_pk="$AUTHENTIK_RESOURCE_ID"
 [[ -n "$provider_pk" ]] || fail "Authentik did not return a provider ID for PBS"
 
 application_payload="$(
@@ -338,7 +340,9 @@ application_payload="$(
       provider: ($provider_pk | tonumber)
     }'
 )"
-application_pk="$(create_or_update_application "$PBS_APPLICATION_SLUG" "PBS" "$application_payload")"
+AUTHENTIK_RESOURCE_ID=""
+create_or_update_application "$PBS_APPLICATION_SLUG" "PBS" "$application_payload"
+application_pk="$AUTHENTIK_RESOURCE_ID"
 [[ -n "$application_pk" ]] || fail "Authentik did not return an application ID for PBS"
 
 application_json="$(find_application_json_by_slug "$PBS_APPLICATION_SLUG")"

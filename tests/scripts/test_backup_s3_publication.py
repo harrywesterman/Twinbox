@@ -45,6 +45,9 @@ def test_publication_helper_contract():
     assert '--service-domain "backup-s3.${public_zone_name}"' in helper
     assert "skipping backup S3 publication" in helper
     assert "managed-seaweedfs" in helper
+    assert "AUTHENTIK_RESOURCE_ID" in helper
+    assert "$(create_or_update_proxy_provider" not in helper
+    assert "$(create_or_update_application" not in helper
 
 
 def test_publication_helper_skips_without_kubeconfig_or_authentik():
