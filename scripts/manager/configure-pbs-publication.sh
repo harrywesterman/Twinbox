@@ -369,8 +369,16 @@ application_uuid="$(extract_authentik_identifier "$application_json")"
 [[ -n "$application_uuid" ]] || fail "Could not determine Authentik application UUID for PBS"
 ensure_group_binding "$application_uuid" "$admins_group_id"
 
-admin_usernames="$(authentik_api_get "/core/groups/${admins_group_id}/users/?page_size=100" \
-  | jq -r '[.results[]? | .username] | map(select(length > 0)) | unique | join("\n")')"
+# Enumerate the Authentik admins group members so their PBS accounts can be
+# granted the Admin role. The group object exposes member user pks in `users`.
+admin_usernames=""
+admins_group_json="$(authentik_api_get "/core/groups/${admins_group_id}/")"
+while IFS= read -r user_pk; do
+  [[ -n "$user_pk" ]] || continue
+  username="$(authentik_api_get "/core/users/${user_pk}/" | jq -r '.username // empty')"
+  [[ -n "$username" ]] && admin_usernames+="${username}"$'\n'
+done <<<"$(printf '%s' "$admins_group_json" | jq -r '.users[]? // empty')"
+admin_usernames="$(printf '%s' "$admin_usernames" | sed '/^$/d' | sort -u)"
 
 jq --arg oidc_client_id "$oidc_client_id" --arg oidc_client_secret "$oidc_client_secret" \
   '.oidc_client_id=$oidc_client_id | .oidc_client_secret=$oidc_client_secret' "$PBS_PROFILE" >"${PBS_PROFILE}.tmp"

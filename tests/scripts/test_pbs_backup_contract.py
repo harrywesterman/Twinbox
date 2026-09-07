@@ -104,6 +104,9 @@ def test_pbs_reverse_proxy_publication_contract():
     assert 'matching_mode: "regex"' in helper
     assert 'matching_mode: "prefix"' not in helper
     assert "pbs_redirect_regex" in helper
+    assert ".users[]?" in helper
+    assert "/core/users/${user_pk}/" in helper
+    assert "/core/groups/${admins_group_id}/users/" not in helper
     assert 'issuer_mode: "per_provider"' in helper
     assert "authorization_code" in helper
     assert "authentik_find_group_id" in helper
