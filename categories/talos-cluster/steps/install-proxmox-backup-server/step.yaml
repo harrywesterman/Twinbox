@@ -15,6 +15,8 @@ dashy:
 depends_on:
   - configure-backup-storage
   - install-management-backup
+  - install-authentik-idp
+  - configure-netbird-ingress
 inputs:
   - id: pbs_node
     label: PBS Proxmox host
@@ -73,6 +75,12 @@ secrets:
       item: netbird-backup-vms
       field: NB_MANAGEMENT_URL
       optional: true
+  files:
+    KUBECONFIG_FILE:
+      scope: cluster
+      item: kubeconfig
+      attachment: kubeconfig
+      format: file
 runner:
   kind: script
   script: categories/talos-cluster/steps/install-proxmox-backup-server/run.sh

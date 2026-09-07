@@ -285,6 +285,8 @@ if [[ -n "${NETBIRD_SETUP_KEY:-}" && -n "${NETBIRD_MANAGEMENT_URL:-}" ]]; then
   NETBIRD_SETUP_KEY="$NETBIRD_SETUP_KEY" NETBIRD_MANAGEMENT_URL="$NETBIRD_MANAGEMENT_URL" \
     bash "$WORKSPACE_ROOT/scripts/manager/register-backup-vms-netbird.sh"
 fi
+PBS_IP_ADDRESS="$ip_address" PBS_SSH_PRIVATE_KEY="$ssh_private_key" PBS_PROFILE="$pbs_profile" \
+  bash "$WORKSPACE_ROOT/scripts/manager/configure-pbs-publication.sh"
 cluster_dns_domain="$(jq -r '.cluster.dns_domain // empty' <<<"$STEP_CONTEXT_JSON")"
 public_zone_name="$(twinbox_public_zone_name "$cluster_slug" "$cluster_dns_domain")"
 jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg storage_id "$storage_id" --arg pbs_admin_url "https://pbs.${public_zone_name}" '{pbs_vm_id:$vm_id,node:$node,storage_id:$storage_id,pbs_admin_url:$pbs_admin_url,verification:"backup-and-restore-read-test"}' >"${STEP_RESULT_FILE:?missing STEP_RESULT_FILE}"

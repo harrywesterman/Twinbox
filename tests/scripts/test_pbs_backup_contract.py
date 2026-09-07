@@ -14,6 +14,9 @@ def test_pbs_step_and_runner_contract():
     assert "default: 128" in step
     assert "pbs_node" in step and "pbs_cache_datastore" in step
     assert "pbs_cpu" in step and "pbs_memory_gb" in step and "pbs_system_disk_gb" in step
+    assert "install-authentik-idp" in step
+    assert "configure-netbird-ingress" in step
+    assert "KUBECONFIG_FILE" in step
     assert "buckets.pbs" in runner
     assert "s3 endpoint create" in runner
     assert "s3 endpoint list --output-format json" in runner
@@ -52,8 +55,8 @@ def test_pbs_step_and_runner_contract():
     assert 'lsblk -nr -o TYPE "$disk"' in runner
     assert "UUID=%s %s ext4 defaults,nofail" in runner
     assert 'findmnt -nr -o UUID --target "$mountpoint"' in runner
-    assert r'tmpdir=\$(mktemp -d)' in runner
-    assert r'tmp=\"\$tmpdir/qemu-server.conf.blob\"' in runner
+    assert r"tmpdir=\$(mktemp -d)" in runner
+    assert r"tmp=\"\$tmpdir/qemu-server.conf.blob\"" in runner
     assert 'TF_VAR_proxmox_endpoint="https://${node_ip}:${PROXMOX_PORT:-8006}"' in runner
     cloud_init = runner.split('cat >"$cloud_init" <<EOF', 1)[1].split("\nEOF", 1)[0]
     assert "pbs_admin_password" not in cloud_init
@@ -76,3 +79,32 @@ def test_pbs_vm_has_required_resources_and_no_fixed_network_defaults():
     assert "depends_on = [proxmox_virtual_environment_download_file.debian]" in module
     assert 'address = "${var.ip_address}/${var.prefix_length}"' in module
     assert "default" not in variables
+
+
+def test_pbs_reverse_proxy_publication_contract():
+    runner = (ROOT / "scripts/manager/install-proxmox-backup-server.sh").read_text()
+    helper = (ROOT / "scripts/manager/configure-pbs-publication.sh").read_text()
+
+    assert "configure-pbs-publication.sh" in runner
+    assert "PBS_IP_ADDRESS=" in runner
+    assert "PBS_SSH_PRIVATE_KEY=" in runner
+    assert "PBS_PROFILE=" in runner
+    assert "ensure-netbird-service.sh" in helper
+    assert '--service-name "pbs"' in helper
+    assert '--service-domain "pbs.${public_zone_name}"' in helper
+    assert "gitops/apps/pbs.yaml" in helper
+    assert "__ZONE_NAME__" in helper
+    assert "__PBS_HOST_IP__" in helper
+    assert "kubectl apply -f" in helper
+    assert "openid create" in helper
+    assert "openid update" in helper
+    assert "--username-claim username" in helper
+    assert "--autocreate 1" in helper
+    assert "acl update / Admin" in helper
+    assert 'matching_mode: "prefix"' in helper
+    assert 'issuer_mode: "per_provider"' in helper
+    assert "authorization_code" in helper
+    assert "authentik_find_group_id" in helper
+    assert "authentik_setup_forward" in helper
+    assert "oidc_client_id" in helper
+    assert "oidc_client_secret" in helper
