@@ -130,7 +130,7 @@ ssh_authorized_key="$(<"${ssh_private_key}.pub")"
 cat >"$cloud_init" <<EOF
 #cloud-config
 package_update: true
-packages: [qemu-guest-agent, curl, ca-certificates, gnupg]
+packages: [qemu-guest-agent, curl, ca-certificates, gnupg, jq]
 users:
   - name: twinbox
     groups: [sudo]
@@ -276,7 +276,7 @@ for attempt in $(seq 1 180); do status="$(pve_get "/nodes/${first_node}/tasks/${
 snapshot_json="$(ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "PBS_FINGERPRINT='${pbs_fingerprint}' PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client snapshot list --repository 'pve@pbs!twinbox@localhost:twinbox-s3' --output-format json")"
 latest_snapshot="$(jq -r --arg vmid "$first_vmid" '[.[]|select(.["backup-type"]=="vm" and (.["backup-id"]|tostring)==$vmid)]|sort_by(.["backup-time"])|last|"vm/\(.["backup-id"])/\(.["backup-time"]|strftime("%Y-%m-%dT%H:%M:%SZ"))"' <<<"$snapshot_json")"
 [[ -n "$latest_snapshot" && "$latest_snapshot" != null ]] || fail "PBS restore-read-test could not find the verification snapshot"
-ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "tmp=\$(mktemp); trap 'rm -f \"\$tmp\"' EXIT; PBS_FINGERPRINT='${pbs_fingerprint}' PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client restore '${latest_snapshot}' qemu-server.conf.blob \"\$tmp\" --repository 'pve@pbs!twinbox@localhost:twinbox-s3' >/dev/null; test -s \"\$tmp\"" || fail "PBS restore-read-test failed"
+ssh "${ssh_opts[@]}" "twinbox@${ip_address}" "tmpdir=\$(mktemp -d); tmp=\"\$tmpdir/qemu-server.conf.blob\"; trap 'rm -rf \"\$tmpdir\"' EXIT; PBS_FINGERPRINT='${pbs_fingerprint}' PBS_PASSWORD='${token_value}' sudo -E proxmox-backup-client restore '${latest_snapshot}' qemu-server.conf.blob \"\$tmp\" --repository 'pve@pbs!twinbox@localhost:twinbox-s3' >/dev/null; test -s \"\$tmp\"" || fail "PBS restore-read-test failed"
 
 jq -n --argjson vm_id "$vm_id" --arg node "$node_name" --arg datastore "$datastore" --arg cache_datastore "$cache_datastore" --argjson cpu "$cpu" --argjson memory_gb "$memory_gb" --argjson system_disk_gb "$system_disk_gb" --argjson cache_disk_gb "$cache_disk_gb" --arg ip "$ip_address" --arg ssh_private_key "$ssh_private_key" --arg fingerprint "$pbs_fingerprint" --arg token_value "$token_value" --arg admin_password "$pbs_admin_password" --arg storage_id "$storage_id" --arg exclude_vmids "$exclude_vmids" \
   '{vm_id:$vm_id,node:$node,datastore:$datastore,cache_datastore:$cache_datastore,cpu:$cpu,memory_gb:$memory_gb,system_disk_gb:$system_disk_gb,cache_disk_gb:$cache_disk_gb,ip_address:$ip,ssh_private_key:$ssh_private_key,fingerprint:$fingerprint,token_value:$token_value,admin_password:$admin_password,pve_storage_id:$storage_id,exclude_vmids:$exclude_vmids,status:"ready",verification:"backup-and-restore-read-test"}' >"$pbs_profile"
