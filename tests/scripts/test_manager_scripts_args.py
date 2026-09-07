@@ -5430,6 +5430,11 @@ def test_dashy_argo_application_manages_the_platform_overlay():
     assert 'Host(`admin.{{index .metadata.annotations "twinbox.io/public-zone-name"}}`)' in text
     assert '.metadata.labels "twinbox.io/resource-profile"' in text
     assert 'dig "twinbox.io/resource-profile"' not in text
+    assert "ignoreDifferences:" in text
+    assert "kind: ConfigMap" in text
+    assert "name: dashy-config" in text
+    assert "- /data/conf.yml.tpl" in text
+    assert "RespectIgnoreDifferences=true" in text
     assert "CreateNamespace=true" in text
 
 

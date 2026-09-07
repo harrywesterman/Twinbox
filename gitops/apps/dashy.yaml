@@ -50,9 +50,17 @@ spec:
       destination:
         server: https://kubernetes.default.svc
         namespace: dashy
+      ignoreDifferences:
+        - group: ""
+          kind: ConfigMap
+          name: dashy-config
+          namespace: dashy
+          jsonPointers:
+            - /data/conf.yml.tpl
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
