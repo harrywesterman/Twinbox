@@ -212,6 +212,15 @@
       "schedule": ["before 06:00 on monday"]
     },
     {
+      "description": "Automerge Helm chart and container image patch, minor, and digest updates",
+      "matchDatasources": ["helm", "docker"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchCurrentVersion": "!/^0/",
+      "minimumReleaseAge": "7 days",
+      "schedule": ["before 06:00 every weekday"],
+      "automerge": true
+    },
+    {
       "description": "Raise critical runtime patch updates every weekday",
       "matchDatasources": ["helm"],
       "matchPackageNames": [
@@ -222,8 +231,7 @@
         "traefik"
       ],
       "matchUpdateTypes": ["patch"],
-      "schedule": ["before 06:00 every weekday"],
-      "automerge": false
+      "schedule": ["before 06:00 every weekday"]
     },
     {
       "description": "Keep runtime lock file maintenance manual",
@@ -237,6 +245,17 @@
       "description": "Automerge stable npm development updates",
       "matchManagers": ["npm"],
       "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "minimumReleaseAge": "14 days",
+      "internalChecksFilter": "strict",
+      "schedule": ["before 06:00 every weekday"],
+      "automerge": true
+    },
+    {
+      "description": "Automerge stable npm runtime updates",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
       "matchUpdateTypes": ["minor", "patch"],
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "14 days",

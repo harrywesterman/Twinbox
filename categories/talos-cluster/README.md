@@ -54,6 +54,7 @@ categories/talos-cluster/
 | `install-tempo` | Deploy Tempo trace storage and query backend |
 | `install-alloy` | Deploy Grafana Alloy as shared logs/events/traces collector |
 | `install-grafana` | Deploy Grafana dashboards with default datasources |
+| `install-trivy-operator` | Deploy Trivy Operator to scan running images for vulnerabilities |
 | `install-crowdsec` | Deploy CrowdSec security engine and Traefik bouncer |
 
 ### Security

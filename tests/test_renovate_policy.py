@@ -73,7 +73,9 @@ def test_only_verify_workflow_digest_updates_are_automerged():
 def test_no_other_package_rule_enables_automerge():
     config = _config()
     allowed = {
+        "Automerge Helm chart and container image patch, minor, and digest updates",
         "Automerge stable npm development updates",
+        "Automerge stable npm runtime updates",
         "Automerge root tooling lock file maintenance",
         "Automerge Verify workflow action digests",
     }
@@ -98,7 +100,7 @@ def test_security_updates_are_automergeable_after_a_short_soak():
     assert config["osvVulnerabilityAlerts"] is True
 
 
-def test_critical_runtime_patch_updates_are_raised_daily_without_automerge():
+def test_critical_runtime_patch_updates_are_raised_daily():
     config = _config()
     rule = _rule(config, "Raise critical runtime patch updates every weekday")
 
@@ -112,7 +114,34 @@ def test_critical_runtime_patch_updates_are_raised_daily_without_automerge():
     }
     assert rule["matchUpdateTypes"] == ["patch"]
     assert rule["schedule"] == ["before 06:00 every weekday"]
-    assert rule["automerge"] is False
+    assert "automerge" not in rule
+
+
+def test_helm_and_image_updates_automerge_non_major():
+    config = _config()
+    rule = _rule(
+        config, "Automerge Helm chart and container image patch, minor, and digest updates"
+    )
+
+    assert set(rule["matchDatasources"]) == {"helm", "docker"}
+    assert set(rule["matchUpdateTypes"]) == {"minor", "patch", "digest"}
+    assert rule["matchCurrentVersion"] == "!/^0/"
+    assert rule["minimumReleaseAge"] == "7 days"
+    assert rule["automerge"] is True
+    assert "major" not in rule["matchUpdateTypes"]
+
+
+def test_npm_runtime_updates_automerge_non_major():
+    config = _config()
+    rule = _rule(config, "Automerge stable npm runtime updates")
+
+    assert rule["matchManagers"] == ["npm"]
+    assert rule["matchDepTypes"] == ["dependencies"]
+    assert set(rule["matchUpdateTypes"]) == {"minor", "patch"}
+    assert rule["matchCurrentVersion"] == "!/^0/"
+    assert rule["minimumReleaseAge"] == "14 days"
+    assert rule["internalChecksFilter"] == "strict"
+    assert rule["automerge"] is True
 
 
 def test_dependabot_version_updates_are_disabled():

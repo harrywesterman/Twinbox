@@ -72,7 +72,7 @@ spec:
               memory: 128Mi
       containers:
         - name: affine
-          image: ghcr.io/toeverything/affine:stable
+          image: ghcr.io/toeverything/affine:stable@sha256:b649f5ce2384ffdf13c23bccf81d759e15973d59d0b0058af65d895a84373099
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

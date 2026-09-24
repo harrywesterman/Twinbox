@@ -125,6 +125,7 @@ function buildCatalog(stepStatuses = {}) {
         ],
       },
     ],
+    ["install-trivy-operator", "Install Trivy Operator", { dependsOn: ["install-prometheus"] }],
     ["install-dashy-dashboard", "Install Dashy dashboard", { dependsOn: ["install-grafana"] }],
     [
       "install-twinbox-portal",
@@ -309,7 +310,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   });
 
   assert.equal(model.mode, "setup");
-  assert.equal(model.stepRail.length, 26);
+  assert.equal(model.stepRail.length, 27);
   const stepRailById = Object.fromEntries(model.stepRail.map((step) => [step.id, step]));
   assert.equal(stepRailById["provision-nodes"].title, "Deploy Talos Cluster");
   assert.equal(stepRailById["provision-nodes"].isCurrent, true);
@@ -337,7 +338,7 @@ test("wizard model exposes a linear setup rail and guided actions", () => {
   assert.equal(stepRailById["install-velero-ui"].title, "Install Velero UI");
   assert.equal(stepRailById["install-velero-ui"].icon, "🖥️");
   assert.equal(model.primaryAction.label, "Next");
-  assert.equal(model.progress.totalSteps, 26);
+  assert.equal(model.progress.totalSteps, 27);
   assert.equal(model.progress.completedSteps, 0);
   assert.equal(model.activity.runtime.currentStage, "Applying cluster plan");
   assert.equal(
@@ -446,6 +447,7 @@ test("wizard model switches to manage mode when setup flow is complete", () => {
         "install-tempo",
         "install-alloy",
         "install-grafana",
+        "install-trivy-operator",
         "install-pgadmin4",
         "install-dashy-dashboard",
         "install-twinbox-portal",
@@ -500,7 +502,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     selectedStepId: "",
   });
 
-  assert.equal(model.stepRail.length, 26);
+  assert.equal(model.stepRail.length, 27);
   const setupStepIds = new Set(model.stepRail.map((step) => step.id));
   for (const id of [
     "provision-nodes",
@@ -528,6 +530,7 @@ test("wizard model keeps manage-only steps out of the setup rail", () => {
     "install-tempo",
     "install-alloy",
     "install-grafana",
+    "install-trivy-operator",
   ]) {
     assert.equal(setupStepIds.has(id), true);
   }

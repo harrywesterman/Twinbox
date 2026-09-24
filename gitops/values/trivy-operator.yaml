@@ -1,0 +1,8 @@
+operator:
+  scanJobsConcurrentLimit: 3
+
+trivy:
+  ignoreUnfixed: false
+
+serviceMonitor:
+  enabled: true
