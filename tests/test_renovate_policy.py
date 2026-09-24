@@ -84,14 +84,18 @@ def test_no_other_package_rule_enables_automerge():
     assert enabled == allowed
 
 
-def test_security_updates_are_immediate_and_assigned():
-    alerts = _config()["vulnerabilityAlerts"]
+def test_security_updates_are_automergeable_after_a_short_soak():
+    config = _config()
+    alerts = config["vulnerabilityAlerts"]
 
     assert alerts["enabled"] is True
     assert alerts["addLabels"] == ["security"]
     assert alerts["assignees"] == ["harrywesterman"]
     assert alerts["schedule"] == []
-    assert alerts["minimumReleaseAge"] is None
+    assert alerts["minimumReleaseAge"] == "3 days"
+    assert alerts["internalChecksFilter"] == "strict"
+    assert alerts["automerge"] is True
+    assert config["osvVulnerabilityAlerts"] is True
 
 
 def test_critical_runtime_patch_updates_are_raised_daily_without_automerge():

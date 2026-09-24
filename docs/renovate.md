@@ -88,6 +88,7 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 | Stable npm `devDependencies` patch/minor | Weekdays before 06:00 | Current version must be 1.0.0 or newer; release must be at least 14 days old |
 | Root `package-lock.json` maintenance | Monday before 06:00 | Root package contains development tooling only |
 | GitHub Actions digest updates in `verify.yml` | Weekdays before 06:00 | Initial digest pinning remains manual |
+| Security / vulnerability fixes | Bypasses the schedule | Fix must be at least 3 days old; auto-merges after `Verify / verify` succeeds |
 
 Security updates bypass the normal schedule. Important runtime Helm chart patch updates for
 `external-secrets`, `jitsi-meet`, `kube-prometheus-stack`, `openbao`, and `traefik` are also
@@ -96,19 +97,26 @@ are not auto-merged by this rule; CI must pass and a human still reviews the run
 
 The following updates are never auto-merged:
 
-- npm runtime dependencies, major versions, prereleases, and dependencies currently on
-  `0.x`
-- nested lockfiles for Manager API/Web/Worker, Portal, Twinbox Agents, and app actions
-- Dockerfiles and Docker Compose images
+- npm runtime dependency feature updates, major versions, prereleases, and dependencies
+  currently on `0.x`
+- nested lockfile maintenance for Manager API/Web/Worker, Portal, Twinbox Agents, and app
+  actions
+- Dockerfiles and Docker Compose images (an unresolved security alert on them can still
+  auto-merge)
 - Helm charts, Argo CD applications, third-party GitOps images, and vendored charts
 - Talos, Kubernetes, Cilium, and all other versions in `config/pinned-defaults.sh`
 - GitHub Actions changes outside `.github/workflows/verify.yml`, including the image publish
   and Pages workflows
 
-GitHub vulnerability alerts bypass the normal schedule and minimum release age. Renovate
-labels these PRs `security` and assigns them to `harrywesterman`. A security update only
-auto-merges when it also matches the low-risk allowlist; all other security updates remain
-manual.
+Security updates bypass the normal branch schedule. Renovate reads GitHub Dependabot alerts
+and, for direct dependencies, OSV alerts (`osvVulnerabilityAlerts`); it labels the PRs
+`security` and assigns `harrywesterman`. A fix that has been released for at least three days
+auto-merges once the required `Verify / verify` check succeeds.
+
+GitHub's dependency graph tracks npm dependencies (including transitive ones, via lockfiles)
+and Dockerfile/Compose images, so security fixes there can auto-merge. Helm charts, Argo CD
+`targetRevision` pins, and GitOps images are not in the dependency graph, so their upgrades —
+security or not — remain manual.
 
 ### Repository safeguards
 
@@ -147,6 +155,9 @@ The configuration lives in `renovate.json`. It uses:
 - **`argocd` manager**: watches `gitops/apps/`, `gitops/optional-apps/`, and `gitops/databases/` for Helm chart `targetRevision` bumps
 - **`regex` managers**: scan `config/pinned-defaults.sh` for pinned infra versions, `gitops/values/` for Docker image overrides, and `gitops/platform-apps/` for inline image tags in workload manifests
 - **`npm` / `dockerfile` / `github-actions`**: standard ecosystem managers
+- **`vulnerabilityAlerts` + `osvVulnerabilityAlerts`**: GitHub Dependabot alerts plus OSV
+  alerts for direct dependencies; fixes auto-merge after a three-day soak once the required
+  `verify` check passes
 
 Validate policy changes with:
 

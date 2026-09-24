@@ -13,12 +13,15 @@
   "lockFileMaintenance": {
     "enabled": true
   },
+  "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "enabled": true,
     "addLabels": ["security"],
     "assignees": ["harrywesterman"],
     "schedule": [],
-    "minimumReleaseAge": null
+    "minimumReleaseAge": "3 days",
+    "internalChecksFilter": "strict",
+    "automerge": true
   },
   "enabledManagers": [
     "argocd",
