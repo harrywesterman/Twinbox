@@ -199,39 +199,12 @@
       "groupSlug": "{{manager}}-{{depName}}"
     },
     {
-      "description": "Schedule manually reviewed updates in the weekly maintenance window",
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch",
-        "pin",
-        "digest",
-        "pinDigest",
-        "lockFileMaintenance"
-      ],
-      "schedule": ["before 06:00 on monday"]
-    },
-    {
       "description": "Automerge Helm chart and container image patch, minor, and digest updates",
       "matchDatasources": ["helm", "docker"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "7 days",
-      "schedule": ["before 06:00 every weekday"],
       "automerge": true
-    },
-    {
-      "description": "Raise critical runtime patch updates every weekday",
-      "matchDatasources": ["helm"],
-      "matchPackageNames": [
-        "external-secrets",
-        "jitsi-meet",
-        "kube-prometheus-stack",
-        "openbao",
-        "traefik"
-      ],
-      "matchUpdateTypes": ["patch"],
-      "schedule": ["before 06:00 every weekday"]
     },
     {
       "description": "Keep runtime lock file maintenance manual",
@@ -249,7 +222,6 @@
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "14 days",
       "internalChecksFilter": "strict",
-      "schedule": ["before 06:00 every weekday"],
       "automerge": true
     },
     {
@@ -260,7 +232,6 @@
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "14 days",
       "internalChecksFilter": "strict",
-      "schedule": ["before 06:00 every weekday"],
       "automerge": true
     },
     {
@@ -269,7 +240,6 @@
       "matchUpdateTypes": ["lockFileMaintenance"],
       "matchFileNames": ["package-lock.json"],
       "groupName": "Root tooling lock file maintenance",
-      "schedule": ["before 06:00 on monday"],
       "automerge": true
     },
     {
@@ -277,7 +247,6 @@
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["digest"],
       "matchFileNames": [".github/workflows/verify.yml"],
-      "schedule": ["before 06:00 every weekday"],
       "automerge": true
     }
   ]

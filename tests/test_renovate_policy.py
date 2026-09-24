@@ -30,7 +30,7 @@ def test_renovate_uses_pr_automerge_behind_the_required_check():
     assert config["prConcurrentLimit"] == 4
 
 
-def test_only_stable_npm_development_updates_are_automerged_daily():
+def test_only_stable_npm_development_updates_are_automerged():
     config = _config()
     rule = _rule(config, "Automerge stable npm development updates")
 
@@ -40,7 +40,6 @@ def test_only_stable_npm_development_updates_are_automerged_daily():
     assert rule["matchCurrentVersion"] == "!/^0/"
     assert rule["minimumReleaseAge"] == "14 days"
     assert rule["internalChecksFilter"] == "strict"
-    assert rule["schedule"] == ["before 06:00 every weekday"]
     assert rule["automerge"] is True
 
 
@@ -100,21 +99,11 @@ def test_security_updates_are_automergeable_after_a_short_soak():
     assert config["osvVulnerabilityAlerts"] is True
 
 
-def test_critical_runtime_patch_updates_are_raised_daily():
+def test_updates_run_at_any_time_without_a_schedule_window():
     config = _config()
-    rule = _rule(config, "Raise critical runtime patch updates every weekday")
 
-    assert rule["matchDatasources"] == ["helm"]
-    assert set(rule["matchPackageNames"]) == {
-        "external-secrets",
-        "jitsi-meet",
-        "kube-prometheus-stack",
-        "openbao",
-        "traefik",
-    }
-    assert rule["matchUpdateTypes"] == ["patch"]
-    assert rule["schedule"] == ["before 06:00 every weekday"]
-    assert "automerge" not in rule
+    scheduled = [rule for rule in config["packageRules"] if "schedule" in rule]
+    assert scheduled == []
 
 
 def test_helm_and_image_updates_automerge_non_major():

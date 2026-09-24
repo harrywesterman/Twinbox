@@ -78,11 +78,6 @@ function buildProjectUrlMap() {
       project_url: "https://grafana.com/oss/loki/",
       github_url: "https://github.com/grafana/loki",
     },
-    "install-trivy-operator": {
-      icon: "🛡️",
-      project_url: "https://trivy.dev/",
-      github_url: "https://github.com/aquasecurity/trivy-operator",
-    },
     "install-tempo": {
       icon: "⏱️",
       project_url: "https://grafana.com/oss/tempo/",

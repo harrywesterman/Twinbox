@@ -25,7 +25,6 @@ bash -n wizard/setup-wizard.sh \
   categories/talos-cluster/steps/install-tempo/run.sh \
   categories/talos-cluster/steps/install-alloy/run.sh \
   categories/talos-cluster/steps/install-grafana/run.sh \
-  categories/talos-cluster/steps/install-trivy-operator/run.sh \
   scripts/manager/install-secret-sync.sh \
   scripts/manager/install-velero-backup.sh \
   scripts/manager/install-management-backup.sh \
@@ -203,20 +202,6 @@ Expected:
 - Grafana is running in `monitoring`
 - Grafana provisions the Prometheus, Loki, and Tempo datasources
 - The seeded Managed Kubernetes Overview, Twinbox Nodes, Twinbox Workloads, Twinbox Control Plane, Twinbox Storage, Twinbox Logs & Events, Twinbox Logs Detail, Twinbox Network, and Twinbox Traefik dashboard ConfigMaps exist and are discovered by the sidecar
-
-### `install-trivy-operator`
-
-```bash
-kubectl --kubeconfig <kubeconfig> get application -n argocd trivy-operator
-kubectl --kubeconfig <kubeconfig> get pods -n trivy-system
-kubectl --kubeconfig <kubeconfig> get vulnerabilityreports -A
-```
-
-Expected:
-
-- `Application/trivy-operator` is synced and healthy
-- The operator and its scan jobs run in `trivy-system`
-- `VulnerabilityReport` resources appear for the workloads in the cluster
 
 ### `install-beszel`
 

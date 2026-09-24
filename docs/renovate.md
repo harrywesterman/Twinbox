@@ -65,7 +65,6 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 - `prometheus` & `prometheus-minimal`
 - `tempo`
 - `traefik`
-- `trivy-operator`
 - `velero` & `velero-ui`
 - `zulip`
 
@@ -86,15 +85,16 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 
 | Update | Schedule | Additional guard |
 |--------|----------|------------------|
-| Stable npm `devDependencies` and runtime `dependencies` patch/minor | Weekdays before 06:00 | Current version must be 1.0.0 or newer; release must be at least 14 days old |
-| Helm charts and container images patch/minor/digest | Weekdays before 06:00 | Current version must be 1.0.0 or newer, so `0.x` charts stay manual; release must be at least 7 days old |
-| Root `package-lock.json` maintenance | Monday before 06:00 | Root package contains development tooling only |
-| GitHub Actions digest updates in `verify.yml` | Weekdays before 06:00 | Initial digest pinning remains manual |
-| Security / vulnerability fixes | Bypasses the schedule | Fix must be at least 3 days old; auto-merges after `Verify / verify` succeeds |
+| Stable npm `devDependencies` and runtime `dependencies` patch/minor | Any time | Current version must be 1.0.0 or newer; release must be at least 14 days old |
+| Helm charts and container images patch/minor/digest | Any time | Current version must be 1.0.0 or newer, so `0.x` charts stay manual; release must be at least 7 days old |
+| Root `package-lock.json` maintenance | Any time | Root package contains development tooling only |
+| GitHub Actions digest updates in `verify.yml` | Any time | Initial digest pinning remains manual |
+| Security / vulnerability fixes | Any time | Fix must be at least 3 days old; auto-merges after `Verify / verify` succeeds |
 
-Critical runtime Helm charts (`external-secrets`, `jitsi-meet`, `kube-prometheus-stack`,
-`openbao`, and `traefik`) still get their patch PRs raised faster before 06:00 on weekdays,
-and they auto-merge through the Helm/image rule above once `Verify / verify` succeeds.
+There is no maintenance window. Renovate may create or update pull requests whenever it
+runs, so a new release shows up as soon as the next Renovate run sees it (subject to the
+release-age guards above). The hosted Renovate app polls periodically rather than
+continuously.
 
 The following updates are never auto-merged (a PR is still opened for review):
 
@@ -108,10 +108,10 @@ The following updates are never auto-merged (a PR is still opened for review):
 - Vendored Helm charts committed under an application (for example the Authentik dependency
   charts)
 
-Security updates bypass the normal branch schedule. Renovate reads GitHub Dependabot alerts
-and, for direct dependencies, OSV alerts (`osvVulnerabilityAlerts`); it labels the PRs
-`security` and assigns `harrywesterman`. A fix that has been released for at least three days
-auto-merges once the required `Verify / verify` check succeeds.
+Renovate reads GitHub Dependabot alerts and, for direct dependencies, OSV alerts
+(`osvVulnerabilityAlerts`); it labels the security PRs `security` and assigns
+`harrywesterman`. A fix that has been released for at least three days auto-merges once the
+required `Verify / verify` check succeeds.
 
 GitHub's dependency graph tracks npm dependencies (including transitive ones, via lockfiles)
 and Dockerfile/Compose images, so CVE-driven security fixes there are automatic. Helm charts
