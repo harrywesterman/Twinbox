@@ -840,7 +840,7 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert 'if [[ -n "${CILIUM_K8S_SERVICE_PORT:-}" ]]; then' in helper_text
     assert "if ((${#helm_args[@]})); then" in helper_text
     assert re.search(r"^PINNED_CILIUM_CHART_VERSION=\S+$", pinned_defaults_text, re.M)
-    assert "PINNED_CLOUDTTY_CHART_VERSION=0.8.9" in pinned_defaults_text
+    assert re.search(r"^PINNED_CLOUDTTY_CHART_VERSION=\d+\.\d+\.\d+$", pinned_defaults_text, re.M)
     assert "PINNED_TRAEFIK_MANAGER_IMAGE_TAG=v0.8.0" in pinned_defaults_text
     assert "ipam:" in values_text
     assert "mode: kubernetes" in values_text
@@ -1193,7 +1193,9 @@ def test_crowdsec_step_seeds_bouncer_secret_and_applies_gitops_app():
     assert 'wait_for_resource_ready "crowdsec" "externalsecret/crowdsec-lapi-secrets"' in step_text
     assert 'wait_for_application_ready "crowdsec"' in step_text
     assert "chart: crowdsec" in crowdsec_app_text
-    assert 'targetRevision: "0.24.0"' in crowdsec_app_text
+    crowdsec_app = yaml.safe_load(crowdsec_app_text)
+    chart_source = next(s for s in crowdsec_app["spec"]["sources"] if s.get("chart") == "crowdsec")
+    assert re.fullmatch(r"\d+\.\d+\.\d+", chart_source["targetRevision"])
     assert "$values/gitops/values/crowdsec.yaml" in crowdsec_app_text
     assert "namespace: crowdsec" in crowdsec_app_text
     assert "managedNamespaceMetadata:" in crowdsec_app_text

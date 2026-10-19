@@ -1,5 +1,19 @@
 # Continuous dependency automation
 
+## Queue recovery (19 October 2026)
+
+Four failing PRs filled the previous four-PR limit, leaving detected updates (including
+Nextcloud) rate-limited. Allow twelve open PRs and sixteen branches so a few failing
+updates leave room for other updates. These remain bounded limits: failures still need
+repair if enough accumulate. Required checks and existing auto-merge eligibility remain
+in force.
+
+Track image references in all YAML files under `gitops/platform-apps/`, including named
+workloads such as Nextcloud's `signaling-deployment.yaml`. Contract tests validate pinned
+version syntax and integration behavior rather than requiring obsolete CloudTTY and
+CrowdSec version literals. Refresh vulnerable npm lockfile dependencies within existing
+version constraints instead of disabling the dependency audit.
+
 ## Goal
 
 Keep GitHub continuously up to date with dependency and security fixes, so Argo CD can roll

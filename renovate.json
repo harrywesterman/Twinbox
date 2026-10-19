@@ -8,7 +8,8 @@
   "ignoreTests": false,
   "ignoreUnstable": true,
   "rebaseWhen": "behind-base-branch",
-  "prConcurrentLimit": 4,
+  "prConcurrentLimit": 12,
+  "branchConcurrentLimit": 16,
   "assignees": ["harrywesterman"],
   "lockFileMaintenance": {
     "enabled": true
@@ -109,9 +110,7 @@
     {
       "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "github-releases",
-      "matchStrings": [
-        "PINNED_ADGUARD_HOME_VERSION=(?<currentValue>v?[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_ADGUARD_HOME_VERSION=(?<currentValue>v?[0-9.]+)"],
       "depNameTemplate": "AdguardTeam/AdGuardHome",
       "customType": "regex"
     },
@@ -127,9 +126,7 @@
       "managerFilePatterns": ["/(^|/)config/pinned-defaults\\.sh$/"],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "https://cloudtty.github.io/cloudtty",
-      "matchStrings": [
-        "PINNED_CLOUDTTY_CHART_VERSION=(?<currentValue>[0-9.]+)"
-      ],
+      "matchStrings": ["PINNED_CLOUDTTY_CHART_VERSION=(?<currentValue>[0-9.]+)"],
       "depNameTemplate": "cloudtty",
       "customType": "regex"
     },
@@ -154,20 +151,14 @@
       "managerFilePatterns": ["/(^|/)gitops/(values|apps)/.*\\.yaml$/"],
       "matchStringsStrategy": "any",
       "datasourceTemplate": "docker",
-      "matchStrings": [
-        "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"
-      ],
+      "matchStrings": ["image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"],
       "customType": "regex"
     },
     {
-      "description": "Image tags in gitops/platform-apps/*/workload yamls",
-      "managerFilePatterns": [
-        "/(^|/)gitops/platform-apps/.+/(deployment|statefulset|daemonset|job|cronjob|redis|valkey|workers|document-converters|manifest|relay-egress)\\.yaml$/"
-      ],
+      "description": "Image tags in all GitOps platform manifests",
+      "managerFilePatterns": ["/(^|/)gitops/platform-apps/.+\\.ya?ml$/"],
       "datasourceTemplate": "docker",
-      "matchStrings": [
-        "image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"
-      ],
+      "matchStrings": ["image:\\s*[\"']?(?<depName>[^:\"'\\s]+):(?<currentValue>[^\"'\\s]+)[\"']?"],
       "customType": "regex"
     }
   ],
@@ -183,7 +174,9 @@
     {
       "description": "Pin typescript to 5.x in eurooffice-file-action: TS 7 (native) lacks the JS compiler API required by @nextcloud/vite-config",
       "matchPackageNames": ["typescript"],
-      "matchFileNames": ["categories/apps/steps/install-nextcloud/eurooffice-file-action/package.json"],
+      "matchFileNames": [
+        "categories/apps/steps/install-nextcloud/eurooffice-file-action/package.json"
+      ],
       "enabled": false
     },
     {

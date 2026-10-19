@@ -27,7 +27,32 @@ def test_renovate_uses_pr_automerge_behind_the_required_check():
     assert config["platformAutomerge"] is True
     assert config["ignoreTests"] is False
     assert config["rebaseWhen"] == "behind-base-branch"
-    assert config["prConcurrentLimit"] == 4
+    assert config["prConcurrentLimit"] == 12
+    assert config["branchConcurrentLimit"] == 16
+
+
+def test_platform_image_detection_covers_named_workloads_and_init_containers():
+    config = _config()
+    manager = next(
+        m
+        for m in config["customManagers"]
+        if m.get("description") == "Image tags in all GitOps platform manifests"
+    )
+    patterns = [re.compile(p[1:-1]) for p in manager["managerFilePatterns"]]
+    image_pattern = re.compile(manager["matchStrings"][0].replace("(?<", "(?P<"))
+    expected = {
+        "nats-deployment.yaml": "nats",
+        "coturn-deployment.yaml": "coturn/coturn",
+        "signaling-deployment.yaml": "strukturag/nextcloud-spreed-signaling",
+        "recording-deployment.yaml": "ghcr.io/nextcloud-releases/aio-talk-recording",
+        "eurooffice-deployment.yaml": "ghcr.io/euro-office/documentserver",
+    }
+    for filename, image in expected.items():
+        path = f"gitops/platform-apps/nextcloud/{filename}"
+        assert any(p.search(path) for p in patterns), path
+        matches = list(image_pattern.finditer((REPO_ROOT / path).read_text()))
+        assert image in {m["depName"] for m in matches}, path
+    assert not any(p.search("manager-data/generated/deployment.yaml") for p in patterns)
 
 
 def test_only_stable_npm_development_updates_are_automerged():
