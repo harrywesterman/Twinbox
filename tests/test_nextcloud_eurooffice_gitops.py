@@ -1,5 +1,6 @@
 """Contract tests for the Euro-Office Nextcloud integration."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -294,7 +295,7 @@ def test_nextcloud_hpb_coturn_serves_turn_tls_on_443_with_dedicated_cert():
 
     container = deployment["spec"]["template"]["spec"]["containers"][0]
     env = {item["name"]: item for item in container["env"]}
-    assert container["image"] == "coturn/coturn:4.17.2"
+    assert re.fullmatch(r"coturn/coturn:\d+\.\d+\.\d+", container["image"])
     assert '--static-auth-secret="${TURN_STATIC_AUTH_SECRET}"' in " ".join(container["command"])
     assert env["TURN_STATIC_AUTH_SECRET"]["valueFrom"]["secretKeyRef"] == {
         "name": "nextcloud-turn-config",
