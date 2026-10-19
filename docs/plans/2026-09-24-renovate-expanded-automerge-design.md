@@ -2,6 +2,10 @@
 
 ## Queue recovery (19 October 2026)
 
+During the catch-up, explicitly allow twelve new PRs per hour instead of the default
+two. Keep the twelve-PR concurrent cap and required checks. Restore the hourly limit to
+two once the eligible backlog has cleared; the Renovate monitor tracks this follow-up.
+
 Four failing PRs filled the previous four-PR limit, leaving detected updates (including
 Nextcloud) rate-limited. Allow twelve open PRs and sixteen branches so a few failing
 updates leave room for other updates. These remain bounded limits: failures still need
