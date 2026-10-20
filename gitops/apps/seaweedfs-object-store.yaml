@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://seaweedfs.github.io/seaweedfs/helm
       chart: seaweedfs
-      targetRevision: "4.45.0"
+      targetRevision: "4.48.0"
       helm:
         valueFiles:
           - $values/gitops/values/seaweedfs-object-store.yaml
