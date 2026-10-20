@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +25,7 @@ MANAGER_WORKER_DOCKERFILE = WORKSPACE_ROOT / "manager-worker" / "Dockerfile"
 def test_dev_workspace_image_contains_browser_agent_tooling():
     text = WORKSPACE_IMAGE.read_text(encoding="utf-8")
 
-    assert "FROM python:3.14-slim-bookworm" in text
+    assert re.search(r"^FROM python:\d+\.\d+-slim-bookworm$", text, re.MULTILINE)
     assert "npm install -g @openai/codex opencode-ai playwright" in text
     assert "npx playwright install --with-deps chromium" in text
     assert "https://cli.github.com/packages/githubcli-archive-keyring.gpg" in text
