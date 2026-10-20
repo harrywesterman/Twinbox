@@ -21,7 +21,7 @@ spec:
       sources:
         - repoURL: https://nextcloud.github.io/helm/
           chart: nextcloud
-          targetRevision: "9.2.6"
+          targetRevision: "9.4.0"
           helm:
             values: |-
               replicaCount: 1
