@@ -15,7 +15,7 @@ configuration:
   general:
     veleroNamespace: velero
     secretPassPhrase:
-      useSecret: false
+      useSecret: true
       existingSecret: velero-ui-bootstrap
       key: pass_phrase
   policies:
