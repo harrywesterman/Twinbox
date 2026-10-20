@@ -28,7 +28,7 @@ def test_renovate_uses_pr_automerge_behind_the_required_check():
     assert config["ignoreTests"] is False
     assert config["rebaseWhen"] == "behind-base-branch"
     assert config["prConcurrentLimit"] == 12
-    assert config["prHourlyLimit"] == 2
+    assert config["prHourlyLimit"] == 12
     assert config["branchConcurrentLimit"] == 16
 
 
