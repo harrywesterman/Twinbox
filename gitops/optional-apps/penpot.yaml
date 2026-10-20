@@ -21,7 +21,7 @@ spec:
       sources:
         - repoURL: https://helm.penpot.app
           chart: penpot
-          targetRevision: "1.9.0"
+          targetRevision: "1.11.3"
           helm:
             values: |-
               config:
