@@ -22,7 +22,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: agent
-          image: henrygd/beszel-agent:0.18.8
+          image: henrygd/beszel-agent:0.21.0
           env:
             - name: HUB_URL
               valueFrom:
