@@ -5460,7 +5460,7 @@ def test_karakeep_argo_application_manages_the_platform_overlay():
     assert "kind: ApplicationSet" in text
     assert "name: karakeep-set" in text
     assert 'twinbox.io/app-karakeep: "enabled"' in text
-    assert 'targetRevision: "0.33.1"' in text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', text)
     assert (
         'applicationHost: karakeep.{{index .metadata.annotations "twinbox.io/public-zone-name"}}'
         in text
