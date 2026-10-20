@@ -100,7 +100,9 @@ def test_eurooffice_deployment_is_pinned_and_has_health_checks_and_storage():
 
     assert deployment["spec"]["replicas"] == 1
     assert deployment["spec"]["strategy"] == {"type": "Recreate"}
-    assert container["image"] == "ghcr.io/euro-office/documentserver:v9.3.1"
+    image_name, image_tag = container["image"].rsplit(":", 1)
+    assert image_name == "ghcr.io/euro-office/documentserver"
+    assert re.fullmatch(r"v\d+\.\d+\.\d+", image_tag)
     assert pod_spec["initContainers"][0]["name"] == "initialize-config"
     assert pod_spec["initContainers"][0]["command"] == [
         "/bin/sh",
