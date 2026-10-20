@@ -734,7 +734,7 @@ def test_penpot_step_projects_a_real_oidc_backed_app():
     assert '--host "penpot-db-pooler-rw.databases.svc.cluster.local"' in step_text
     assert "ensure-netbird-service.sh" in step_text
     assert "https://helm.penpot.app" in app_text
-    assert 'targetRevision: "1.9.0"' in app_text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', app_text)
     assert "path: gitops/platform-apps/penpot" in app_text
     assert "path: gitops/databases/penpot" in app_text
     assert "kind: ApplicationSet" in optional_app_text

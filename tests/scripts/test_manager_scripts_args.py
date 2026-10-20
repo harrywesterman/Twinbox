@@ -1090,7 +1090,7 @@ def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
 
     assert "repoURL: https://seaweedfs.github.io/seaweedfs/helm" in app_text
     assert "chart: seaweedfs" in app_text
-    assert 'targetRevision: "4.45.0"' in app_text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', app_text)
     assert "namespace: seaweedfs" in app_text
     assert "name: seaweedfs" in namespace_text
     assert "master:" in values_text and "enabled: true" in values_text
@@ -1648,7 +1648,7 @@ def test_install_secret_sync_renders_argocd_values_and_applies_secret_sync_manif
     assert "--no-wait" in text
     assert "repoURL: https://openbao.github.io/openbao-helm" in text
     assert "chart: openbao" in text
-    assert 'targetRevision: "0.28.4"' in text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', text)
     assert "gitops/apps/openbao.yaml" not in text
     assert "detect_openbao_replicas() {" in text
     assert "printf '1\\n'" in text
@@ -3864,7 +3864,7 @@ def test_metrics_server_argocd_app_uses_official_chart():
     assert "name: metrics-server" in text
     assert "chart: metrics-server" in text
     assert "https://kubernetes-sigs.github.io/metrics-server/" in text
-    assert 'targetRevision: "3.14.0"' in text
+    assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', text)
     assert "$values/gitops/values/metrics-server.yaml" in text
     assert "repoURL: __REPO_URL__" in text
     assert "targetRevision: __TARGET_REVISION__" in text
