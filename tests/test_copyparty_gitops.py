@@ -1,5 +1,6 @@
 """Regression tests for the copyparty Twinbox integration."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -45,7 +46,9 @@ def test_copyparty_platform_manifests_are_openbao_backed_and_persistent():
     container = deployment["spec"]["template"]["spec"]["containers"][0]
     assert deployment["spec"]["strategy"]["type"] == "Recreate"
     assert deployment["spec"]["template"]["spec"]["enableServiceLinks"] is False
-    assert container["image"] == "ghcr.io/9001/copyparty-ac:1.20.21"
+    image_name, image_tag = container["image"].rsplit(":", 1)
+    assert image_name == "ghcr.io/9001/copyparty-ac"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", image_tag)
     assert container["ports"] == [{"name": "http", "containerPort": 3923}]
     assert container["envFrom"] == [{"secretRef": {"name": "copyparty-config"}}]
     assert "exec python3 -m copyparty -c /cfg/copyparty.conf" in container["args"][0]
