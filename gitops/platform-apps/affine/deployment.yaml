@@ -50,7 +50,7 @@ spec:
             - name: affine-config-template
               mountPath: /affine-config-template
         - name: wait-for-redis
-          image: redis:7-alpine
+          image: redis:8-alpine
           imagePullPolicy: IfNotPresent
           command:
             - sh
