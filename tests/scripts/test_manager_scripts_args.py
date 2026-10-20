@@ -3812,6 +3812,7 @@ def test_talos_module_is_vm_only_and_keeps_planned_outputs():
 
 PROMETHEUS_APP = REPO_ROOT / "gitops" / "apps" / "prometheus.yaml"
 PROMETHEUS_VALUES = REPO_ROOT / "gitops" / "values" / "prometheus.yaml"
+PROMETHEUS_MINIMAL_VALUES = REPO_ROOT / "gitops" / "values" / "prometheus-minimal.yaml"
 METRICS_SERVER_APP = REPO_ROOT / "gitops" / "apps" / "metrics-server.yaml"
 METRICS_SERVER_VALUES = REPO_ROOT / "gitops" / "values" / "metrics-server.yaml"
 PROMETHEUS_INGRESSROUTE = (
@@ -3914,6 +3915,14 @@ def test_prometheus_values_configures_alertmanager_and_storage():
     assert "cpu: 100m" in text
     assert "memory: 768Mi" in text
     assert "cpu: 750m" in text
+
+
+def test_prometheus_values_enable_crd_upgrade_job_for_both_profiles():
+    for values_path in (PROMETHEUS_VALUES, PROMETHEUS_MINIMAL_VALUES):
+        values = yaml.safe_load(values_path.read_text(encoding="utf-8"))
+        assert values["crds"]["enabled"] is True
+        assert values["crds"]["upgradeJob"]["enabled"] is True
+        assert values["crds"]["upgradeJob"]["forceConflicts"] is True
 
 
 def test_prometheus_ingressroute_exposes_ui():
