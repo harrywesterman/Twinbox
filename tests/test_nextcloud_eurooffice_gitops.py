@@ -480,6 +480,16 @@ def test_nextcloud_bootstrap_installs_the_modern_eurooffice_file_action():
     assert "php occ app:enable twinbox_eurooffice_action" in install_text
 
 
+def test_eurooffice_file_action_pins_the_audited_types_plugin_override():
+    package = yaml.safe_load((EUROOFFICE_ACTION_DIR / "package.json").read_text())
+    lockfile = yaml.safe_load((EUROOFFICE_ACTION_DIR / "package-lock.json").read_text())
+
+    assert package["overrides"]["@nextcloud/vite-config"]["vite-plugin-dts"] == "5.1.2"
+    assert lockfile["packages"]["node_modules/vite-plugin-dts"]["version"] == "5.1.2"
+    assert "node_modules/@microsoft/api-extractor" not in lockfile["packages"]
+    assert "node_modules/sprintf-js" not in lockfile["packages"]
+
+
 def test_nextcloud_mail_uses_per_user_mailu_tokens():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
