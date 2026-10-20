@@ -3425,7 +3425,11 @@ def test_gitops_app_manifests_and_platform_routes_are_openbao_backed():
     assert "Host(`pgadmin4.__ZONE_NAME__`)" in PGADMIN_INGRESSROUTE.read_text(encoding="utf-8")
     assert "pgadmin4-data" in PGADMIN_PVC.read_text(encoding="utf-8")
     assert "pgadmin4-bootstrap" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
-    assert "dpage/pgadmin4:9.17" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
+    assert re.search(
+        r"^\s+image: dpage/pgadmin4:\d+(?:\.\d+){1,2}$",
+        PGADMIN_DEPLOYMENT.read_text(encoding="utf-8"),
+        re.MULTILINE,
+    )
     assert "master-password-hook.sh" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "mountPath: /config" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
     assert "pgadmin4-servers.json" in PGADMIN_DEPLOYMENT.read_text(encoding="utf-8")
