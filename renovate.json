@@ -193,11 +193,13 @@
       "groupSlug": "{{manager}}-{{depName}}"
     },
     {
-      "description": "Automerge Helm chart and container image patch, minor, and digest updates",
+      "description": "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
       "matchDatasources": ["helm", "docker"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "internalChecksFilter": "strict",
       "automerge": true
     },
     {

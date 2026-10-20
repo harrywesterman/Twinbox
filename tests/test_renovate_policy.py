@@ -98,7 +98,7 @@ def test_only_verify_workflow_digest_updates_are_automerged():
 def test_no_other_package_rule_enables_automerge():
     config = _config()
     allowed = {
-        "Automerge Helm chart and container image patch, minor, and digest updates",
+        "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
         "Automerge stable npm development updates",
         "Automerge stable npm runtime updates",
         "Automerge root tooling lock file maintenance",
@@ -135,13 +135,16 @@ def test_updates_run_at_any_time_without_a_schedule_window():
 def test_helm_and_image_updates_automerge_non_major():
     config = _config()
     rule = _rule(
-        config, "Automerge Helm chart and container image patch, minor, and digest updates"
+        config,
+        "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
     )
 
     assert set(rule["matchDatasources"]) == {"helm", "docker"}
     assert set(rule["matchUpdateTypes"]) == {"minor", "patch", "digest"}
     assert rule["matchCurrentVersion"] == "!/^0/"
     assert rule["minimumReleaseAge"] == "7 days"
+    assert rule["minimumReleaseAgeBehaviour"] == "timestamp-optional"
+    assert rule["internalChecksFilter"] == "strict"
     assert rule["automerge"] is True
     assert "major" not in rule["matchUpdateTypes"]
 
