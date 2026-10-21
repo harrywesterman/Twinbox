@@ -4665,14 +4665,9 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert 'ensure_group_binding "$application_uuid" "$admins_group_id"' not in step_text
     assert "Could not resolve Authentik admins group ID" not in step_text
 
-    assert (
-        "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm"
-        in deployment_text
-    )
-    assert (
-        "ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm"
-        in workers_text
-    )
+    pixelfed_image = "ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm"
+    assert deployment_text.count(f"image: {pixelfed_image}") == 2
+    assert workers_text.count(f"image: {pixelfed_image}") == 4
     assert "APP_URL" in deployment_text
     assert "APP_DOMAIN" in deployment_text
     assert "DB_HOST" in deployment_text

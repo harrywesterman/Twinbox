@@ -22,7 +22,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       initContainers:
         - name: prepare-pixelfed-storage
-          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -47,7 +47,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: pixelfed-worker
-          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - php
@@ -227,7 +227,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       initContainers:
         - name: prepare-pixelfed-storage
-          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -252,7 +252,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: pixelfed-scheduler
-          image: ghcr.io/jippi/docker-pixelfed:nightly-2026-05-10-staging-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - php
