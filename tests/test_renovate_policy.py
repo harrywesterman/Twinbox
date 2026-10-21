@@ -28,7 +28,7 @@ def test_renovate_uses_pr_automerge_behind_the_required_check():
     assert config["ignoreTests"] is False
     assert config["rebaseWhen"] == "behind-base-branch"
     assert config["prConcurrentLimit"] == 12
-    assert config["prHourlyLimit"] == 2
+    assert config["prHourlyLimit"] == 12
     assert config["branchConcurrentLimit"] == 16
 
 
@@ -182,3 +182,14 @@ def test_image_reference_push_uses_the_dedicated_deploy_key():
 
     assert "ssh-key: ${{ secrets.TWINBOX_IMAGE_REFS_DEPLOY_KEY }}" in update_refs
     assert "token: ${{ secrets.GITHUB_TOKEN }}" not in update_refs
+
+
+def test_image_reference_push_skips_stale_runs_and_retries_concurrent_updates():
+    workflow = (WORKFLOWS_DIR / "docker-publish.yml").read_text(encoding="utf-8")
+    commit_step = workflow.split("      - name: Commit and push if changed", maxsplit=1)[1]
+
+    assert "git fetch origin main" in commit_step
+    assert "git rev-parse origin/main" in commit_step
+    assert '"$GITHUB_SHA"' in commit_step
+    assert "for attempt in 1 2 3" in commit_step
+    assert "main moved during the push" in commit_step

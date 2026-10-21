@@ -511,7 +511,19 @@ jobs:
             git config user.email "twinbox@twinbox.local"
             git add -A
             git commit -m "chore: bump image tags to ${{ steps.sha.outputs.short }} [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              git fetch origin main
+              if [[ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]]; then
+                echo "main advanced during the image build; a newer run owns image references."
+                exit 0
+              fi
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+              echo "main moved during the push; checking again (attempt $attempt)."
+            done
+            echo "Could not update pinned image references after three attempts." >&2
+            exit 1
           else
             echo "No changes to commit"
           fi
