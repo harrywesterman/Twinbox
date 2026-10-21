@@ -24,9 +24,9 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 Because packages are public, no login should be required. Check:
 
 ```bash
-docker pull ghcr.io/harrywesterman/twinbox-manager-api:sha-0884076
-docker pull ghcr.io/harrywesterman/twinbox-manager-worker:sha-0884076
-docker pull ghcr.io/harrywesterman/twinbox-manager-web:sha-0884076
+docker pull ghcr.io/harrywesterman/twinbox-manager-api:sha-db9d906
+docker pull ghcr.io/harrywesterman/twinbox-manager-worker:sha-db9d906
+docker pull ghcr.io/harrywesterman/twinbox-manager-web:sha-db9d906
 ```
 
 If this fails, verify image names/tags and package visibility in GitHub package settings.
