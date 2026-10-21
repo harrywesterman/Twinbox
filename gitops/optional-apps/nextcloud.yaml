@@ -26,6 +26,9 @@ spec:
             values: |-
               replicaCount: 1
 
+              image:
+                pullPolicy: Always
+
               service:
                 type: ClusterIP
 

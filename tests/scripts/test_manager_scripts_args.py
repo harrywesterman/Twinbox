@@ -5270,6 +5270,7 @@ def test_install_nextcloud_step_uses_its_own_manifests_and_oidc_bootstrap():
     assert "name: nextcloud-set" in optional_app_text
     assert 'twinbox.io/app-nextcloud: "enabled"' in optional_app_text
     assert re.search(r'targetRevision:\s*"\d+\.\d+\.\d+"', optional_app_text)
+    assert re.search(r"(?m)^\s+pullPolicy: Always$", optional_app_text)
     assert "path: gitops/platform-apps/nextcloud" in optional_app_text
     assert "path: gitops/databases/nextcloud" in optional_app_text
     assert "name: nextcloud-well-known-redirect" in optional_app_text
