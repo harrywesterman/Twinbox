@@ -30,7 +30,17 @@ def test_dev_workspace_image_contains_browser_agent_tooling():
     assert "npx playwright install --with-deps chromium" in text
     assert "https://cli.github.com/packages/githubcli-archive-keyring.gpg" in text
     assert "apt-get install -y --no-install-recommends gh" in text
+    assert "ARG CODE_SERVER_VERSION=4.141.0" in text
+    assert "ARG SHELL_QUOTE_VERSION=1.11.0" in text
+    assert (
+        "ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea"
+        in text
+    )
     assert "code-server_${CODE_SERVER_VERSION}_${TARGETARCH}.deb" in text
+    assert 'npm pack "shell-quote@${SHELL_QUOTE_VERSION}" --pack-destination /tmp' in text
+    assert "sha512sum -c -" in text
+    assert 'tar -xzf "/tmp/shell-quote-${SHELL_QUOTE_VERSION}.tgz" --strip-components=1' in text
+    assert "/usr/lib/code-server/lib/vscode/node_modules/shell-quote" in text
     assert "kubectl" in text
     assert "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" in text
     assert "talosctl-linux-${TARGETARCH}" in text

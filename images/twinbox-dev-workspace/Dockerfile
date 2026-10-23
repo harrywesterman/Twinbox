@@ -1,7 +1,9 @@
 FROM python:3.15-slim-bookworm
 
 ARG TARGETARCH=amd64
-ARG CODE_SERVER_VERSION=4.135.0
+ARG CODE_SERVER_VERSION=4.141.0
+ARG SHELL_QUOTE_VERSION=1.11.0
+ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea
 ARG KUBECTL_VERSION=v1.36.4
 ARG HELM_VERSION=v4.2.4
 ARG K9S_VERSION=v0.51.0
@@ -54,6 +56,13 @@ RUN apt-get update \
     -o /tmp/code-server.deb \
   && apt-get install -y --no-install-recommends /tmp/code-server.deb \
   && rm -f /tmp/code-server.deb \
+  && npm pack "shell-quote@${SHELL_QUOTE_VERSION}" --pack-destination /tmp \
+  && echo "${SHELL_QUOTE_SHA512}  /tmp/shell-quote-${SHELL_QUOTE_VERSION}.tgz" | sha512sum -c - \
+  && rm -rf /usr/lib/code-server/lib/vscode/node_modules/shell-quote \
+  && mkdir -p /usr/lib/code-server/lib/vscode/node_modules/shell-quote \
+  && tar -xzf "/tmp/shell-quote-${SHELL_QUOTE_VERSION}.tgz" --strip-components=1 \
+    -C /usr/lib/code-server/lib/vscode/node_modules/shell-quote \
+  && rm -f "/tmp/shell-quote-${SHELL_QUOTE_VERSION}.tgz" \
   && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
     -o /usr/local/bin/kubectl \
   && chmod 0755 /usr/local/bin/kubectl \
