@@ -33,6 +33,10 @@ write_files:
     permissions: "0700"
     content: |
       ${indent(6, netbird_bootstrap_script)}
+  - path: /root/configure-netbird-crowdsec.py
+    permissions: "0700"
+    content: |
+      ${indent(6, crowdsec_helper_script)}
 
 runcmd:
   - ufw allow 22/tcp

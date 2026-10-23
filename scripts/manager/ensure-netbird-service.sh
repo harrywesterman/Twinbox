@@ -11,6 +11,7 @@ usage() {
   echo "          [--target-type <host|domain|cluster>] [--target-id <id>]" >&2
   echo "          [--target-host <host>] [--target-port <port>] [--target-protocol <http|https|tls>]" >&2
   echo "          [--target-direct-upstream <true|false>] [--target-skip-tls-verify <true|false>]" >&2
+  echo "          [--crowdsec-mode <off|observe|enforce>]" >&2
   echo "       $0 --normalize-collection <field> < json" >&2
   exit 1
 }
@@ -28,6 +29,7 @@ TARGET_PORT_OVERRIDE=""
 TARGET_PROTOCOL_OVERRIDE=""
 TARGET_DIRECT_UPSTREAM_OVERRIDE=""
 TARGET_SKIP_TLS_VERIFY_OVERRIDE=""
+CROWDSEC_MODE="enforce"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -44,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --target-protocol) TARGET_PROTOCOL_OVERRIDE="$2"; shift 2 ;;
     --target-direct-upstream) TARGET_DIRECT_UPSTREAM_OVERRIDE="$2"; shift 2 ;;
     --target-skip-tls-verify) TARGET_SKIP_TLS_VERIFY_OVERRIDE="$2"; shift 2 ;;
+    --crowdsec-mode) CROWDSEC_MODE="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -86,6 +89,10 @@ fi
 
 [[ -n "$SERVICE_NAME" ]] || usage
 [[ -n "$SERVICE_DOMAIN" ]] || usage
+case "$CROWDSEC_MODE" in
+  off|observe|enforce) ;;
+  *) fail_netbird "Invalid CrowdSec mode: $CROWDSEC_MODE" ;;
+esac
 
 api_get() {
   local url="$1"
@@ -366,11 +373,14 @@ check_existing_service() {
   response="$(api_get_services)" || return 1
   printf '%s' "$response" \
     | normalize_netbird_collection "services" \
-    | jq -r '.[]? | select(.domain == "'"$SERVICE_DOMAIN"'" and .name == "'"$SERVICE_NAME"'") | .id // empty' \
+    | jq -c --arg domain "$SERVICE_DOMAIN" --arg name "$SERVICE_NAME" \
+      'first(.[]? | select(.domain == $domain and .name == $name)) // empty' \
     | head -n1
 }
 
-EXISTING_SERVICE_ID="$(check_existing_service)" || fail_netbird "Could not query NetBird reverse proxy services for ${SERVICE_NAME}. Check the NetBird API token and management URL."
+EXISTING_SERVICE_JSON="$(check_existing_service)" || fail_netbird "Could not query NetBird reverse proxy services for ${SERVICE_NAME}. Check the NetBird API token and management URL."
+EXISTING_SERVICE_ID="$(jq -r '.id // empty' <<<"${EXISTING_SERVICE_JSON:-{}}")"
+EXISTING_ACCESS_RESTRICTIONS="$(jq -c '.access_restrictions // {}' <<<"${EXISTING_SERVICE_JSON:-{}}")"
 
 # 3. Build the service payload. The network step creates the Traefik resource
 # and writes its ID to the network secret; the live cluster resources endpoint
@@ -403,6 +413,8 @@ build_service_payload() {
     --argjson direct_upstream "$TARGET_DIRECT_UPSTREAM" \
     --argjson skip_tls_verify "$TARGET_SKIP_TLS_VERIFY" \
     --argjson mode_listen "$mode_listen_json" \
+    --argjson access_restrictions "$EXISTING_ACCESS_RESTRICTIONS" \
+    --arg crowdsec_mode "$CROWDSEC_MODE" \
     '{
       name: $name,
       domain: $domain,
@@ -427,7 +439,8 @@ build_service_payload() {
         password_auth: { enabled: false },
         pin_auth: { enabled: false },
         bearer_auth: { enabled: false }
-      }
+      },
+      access_restrictions: ($access_restrictions + {crowdsec_mode: $crowdsec_mode})
     } * $mode_listen'
 }
 

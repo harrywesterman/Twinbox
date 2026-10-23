@@ -308,7 +308,7 @@ overrides = (
     '  REVERSE_PROXY_TYPE="0"\n'
     '  TRAEFIK_ACME_EMAIL="' + os.environ['ADMIN_EMAIL'] + '"\n'
     '  ENABLE_PROXY="true"\n'
-    '  ENABLE_CROWDSEC="false"\n'
+    '  ENABLE_CROWDSEC="true"\n'
     "  return 0\n"
     "}\n"
 )
@@ -639,6 +639,9 @@ for key, value in updates.items():
 path.write_text("\n".join(out) + "\n")
 PY
 fi
+
+python3 /root/configure-netbird-crowdsec.py
+docker compose config --quiet
 
 install_netbird_wildcard_certificate
 install_netbird_wildcard_renewal_timer

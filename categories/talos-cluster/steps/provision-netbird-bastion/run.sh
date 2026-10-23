@@ -378,11 +378,12 @@ upload_existing_bastion_bootstrap() {
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
     -i "$bastion_ssh_key_path" \
     "$render_dir/bootstrap-netbird.sh" \
+    "$render_dir/configure-netbird-crowdsec.py" \
     "$render_dir/bootstrap.env" \
     "$render_dir/dns-credentials" \
     "${bastion_ssh_user}@${bastion_ssh_host}:${remote_dir}/"
 
-  bastion_ssh 'install -d -m 0755 /opt/netbird && install -m 0600 /root/twinbox-netbird-bootstrap/bootstrap.env /opt/netbird/.bootstrap.env && install -m 0600 /root/twinbox-netbird-bootstrap/dns-credentials /opt/netbird/.dns-credentials && install -m 0700 /root/twinbox-netbird-bootstrap/bootstrap-netbird.sh /root/bootstrap-netbird.sh'
+  bastion_ssh 'install -d -m 0755 /opt/netbird && install -m 0600 /root/twinbox-netbird-bootstrap/bootstrap.env /opt/netbird/.bootstrap.env && install -m 0600 /root/twinbox-netbird-bootstrap/dns-credentials /opt/netbird/.dns-credentials && install -m 0700 /root/twinbox-netbird-bootstrap/bootstrap-netbird.sh /root/bootstrap-netbird.sh && install -m 0700 /root/twinbox-netbird-bootstrap/configure-netbird-crowdsec.py /root/configure-netbird-crowdsec.py'
 }
 
 run_existing_bastion_bootstrap() {
@@ -458,6 +459,7 @@ provision_existing_bastion() {
   register_temp_path "$render_dir"
   python3 "$WORKSPACE_ROOT/scripts/manager/render-netbird-bastion-bootstrap.py" \
     --template "$WORKSPACE_ROOT/scripts/manager/netbird-bastion-bootstrap-template.sh" \
+    --crowdsec-helper "$WORKSPACE_ROOT/scripts/manager/configure-netbird-crowdsec.py" \
     --output-dir "$render_dir" \
     --netbird-fqdn "$netbird_fqdn" \
     --netbird-proxy-domain "$netbird_proxy_domain" \

@@ -37,5 +37,6 @@ resource "hcloud_server" "netbird" {
     opkssh_issuer_url        = var.opkssh_issuer_url
     opkssh_client_id         = var.opkssh_client_id
     netbird_bootstrap_script = file(local.bootstrap_script_path)
+    crowdsec_helper_script   = file(local.crowdsec_helper_path)
   })
 }

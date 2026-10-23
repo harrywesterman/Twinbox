@@ -1,5 +1,11 @@
 # CrowdSec
 
+The cluster installation documented below is separate from CrowdSec on the
+NetBird bastion. On the bastion, NetBird Reverse Proxy uses CrowdSec IP
+reputation per service, while bastion Traefik uses AppSec for the public
+NetBird dashboard and management API. See [NetBird](netbird.md) for setup,
+the observe-to-enforce rollout, and SSH recovery.
+
 CrowdSec is a collaborative intrusion detection system (IDS) that analyzes service logs for suspicious behavior and exposes remediation decisions to Traefik through a bouncer plugin.
 
 ## Architecture

@@ -1,0 +1,29 @@
+id: configure-netbird-crowdsec
+title: Configure NetBird CrowdSec
+type: action
+journey_stage: manage
+summary: Enable NetBird IP reputation and protect its dashboard with AppSec.
+explanation: >
+  Configure a CrowdSec Local API on the existing Twinbox-managed NetBird bastion,
+  protect the dashboard and management API with AppSec, and reconcile CrowdSec
+  IP reputation on Twinbox reverse-proxy services. Start in observe mode and
+  rerun with enforce after checking false positives.
+side_help: >
+  Keep independent SSH access to the bastion. This step preserves the existing
+  NetBird installation, secrets and CrowdSec data. Enforce mode fails closed
+  while the proxy's CrowdSec decision cache has not completed its first sync.
+ingress_route: netbird
+inputs:
+  - id: crowdsec_mode
+    label: CrowdSec mode
+    type: string
+    required: true
+    default: observe
+    options:
+      - label: Observe
+        value: observe
+      - label: Enforce
+        value: enforce
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-netbird-crowdsec/run.sh

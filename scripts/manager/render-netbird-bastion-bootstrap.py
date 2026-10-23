@@ -21,6 +21,7 @@ def write_private_file(path: Path, content: str, mode: int) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", required=True, type=Path)
+    parser.add_argument("--crowdsec-helper", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--netbird-fqdn", required=True)
     parser.add_argument("--netbird-proxy-domain", required=True)
@@ -40,6 +41,11 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     write_private_file(output_dir / "bootstrap-netbird.sh", template, 0o700)
+    write_private_file(
+        output_dir / "configure-netbird-crowdsec.py",
+        args.crowdsec_helper.read_text(encoding="utf-8"),
+        0o700,
+    )
     write_private_file(
         output_dir / "bootstrap.env",
         "\n".join(

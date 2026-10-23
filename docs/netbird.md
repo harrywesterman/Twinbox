@@ -18,6 +18,7 @@ In the current Twinbox implementation, NetBird is used for five related paths:
 | --- | --- | --- |
 | NetBird bastion | Hetzner VPS or existing Debian/Ubuntu VM | Runs the self-hosted NetBird server, dashboard, management API, embedded relay/proxy stack, Docker, and Traefik for the NetBird hostname. |
 | NetBird Reverse Proxy | Bastion Docker stack | Terminates public HTTPS for app hostnames such as `authentik.ZONE` and forwards requests into the NetBird network. |
+| CrowdSec on bastion | Bastion Docker stack | Supplies community IP decisions to NetBird Reverse Proxy and AppSec request inspection to bastion Traefik for the NetBird dashboard and API. This is separate from cluster CrowdSec. |
 | NetBird network resources | NetBird management API | Defines the internal Traefik ClusterIP target, groups, setup keys, routes, and policies. |
 | Routing peer | Kubernetes namespace `netbird` | Runs `netbirdio/netbird:0.73.2` with privileged networking and forwards proxy traffic to the cluster service network. |
 | Traefik NetBird backend | Kubernetes service `traefik/traefik` | Stable ClusterIP service exposing Traefik's `webnetbird` entrypoint on port `8082`. |
@@ -116,6 +117,28 @@ service targets the NetBird network resource for the internal Traefik backend:
 ```text
 <traefik-cluster-ip>:8082
 ```
+
+Twinbox enables CrowdSec on newly bootstrapped NetBird bastions. NetBird Proxy
+checks the original client IP against its own bastion LAPI decision cache; new
+Twinbox services use `enforce`. The `configure-netbird-crowdsec` management step
+adds the same configuration to an existing Twinbox bastion without rerunning
+the provisioning step. Run it first with `observe`, inspect NetBird Reverse
+Proxy access logs for false positives, then rerun with `enforce`. The step
+reconciles existing services in the dedicated Twinbox proxy zone while
+preserving their other access restrictions. The proxy fails closed for enforced
+services until its initial decision sync completes.
+
+The bastion Traefik plugin separately applies CrowdSec AppSec to the NetBird
+dashboard, `/api`, and `/oauth2` HTTP routes. It does not attach an HTTP
+middleware to the TCP passthrough router. Its bouncer key differs from the
+NetBird Proxy key. The bastion LAPI and the Kubernetes CrowdSec LAPI are
+independent; cluster apps on `webnetbird` do not gain AppSec from this change.
+Keep SSH access to the bastion available during rollout. Backups of changed
+configuration are kept under `/opt/netbird/backups/`; CrowdSec database and
+certificate volumes are preserved. If an admin IP is blocked, inspect
+`cscli decisions list` over SSH and remove the decision or add a deliberate
+allowlist entry. An AppSec rule can block an individual request without creating
+an IP decision.
 
 Services are created per-application as each `install-*` step runs, using the
 helper script that reads credentials from the bastion secret. The
