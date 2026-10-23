@@ -117,6 +117,7 @@ def test_no_other_package_rule_enables_automerge():
     config = _config()
     allowed = {
         "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
+        "Automerge patched Node image releases after one day",
         "Automerge stable npm development updates",
         "Automerge stable npm runtime updates",
         "Automerge root tooling lock file maintenance",
@@ -141,6 +142,16 @@ def test_security_updates_are_automergeable_after_a_short_soak():
     assert alerts["internalChecksFilter"] == "strict"
     assert alerts["automerge"] is True
     assert config["osvVulnerabilityAlerts"] is True
+
+
+def test_node_image_patch_updates_have_one_day_wait_without_major_automerge():
+    rule = _rule(_config(), "Automerge patched Node image releases after one day")
+    assert rule["matchDatasources"] == ["docker"]
+    assert rule["matchPackageNames"] == ["node"]
+    assert rule["matchUpdateTypes"] == ["patch"]
+    assert rule["minimumReleaseAge"] == "1 day"
+    assert rule["internalChecksFilter"] == "strict"
+    assert rule["automerge"] is True
 
 
 def test_updates_run_at_any_time_without_a_schedule_window():

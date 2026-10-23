@@ -36,42 +36,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
-          filters: |
-            force_all:
-              - '.github/workflows/docker-publish.yml'
-            manager_api:
-              - 'manager-api/**'
-              - 'manager-api/Dockerfile'
-              - 'lib/**'
-              - 'categories/**'
-              - 'manager-web/src/assets/step-icons/**'
-            manager_worker:
-              - 'manager-worker/**'
-              - 'manager-worker/Dockerfile'
-              - 'config/**'
-              - 'lib/**'
-              - 'categories/**'
-              - 'infra/**'
-              - 'gitops/**'
-              - 'scripts/manager/**'
-              - 'scripts/get-talos-image-factory.sh'
-              - 'manager-web/src/assets/step-icons/**'
-            manager_web:
-              - 'lib/**'
-              - 'manager-web/**'
-              - 'manager-web/Dockerfile'
-            portal:
-              - 'portal/**'
-              - 'portal/Dockerfile'
-            twinbox_agents:
-              - 'twinbox-agents/**'
-              - 'twinbox-agents/Dockerfile'
-            jitsi_openid:
-              - 'images/jitsi-openid/**'
-            twinbox_dev_workspace:
-              - 'images/twinbox-dev-workspace/**'
-              - 'infra/coder/templates/twinbox-development/**'
-
+          filters: .github/image-build-filters.yml
       - name: Select images to build
         id: select
         env:
@@ -85,129 +50,7 @@ jobs:
           TWINBOX_AGENTS_CHANGED: ${{ steps.filter.outputs.twinbox_agents || 'false' }}
           JITSI_OPENID_CHANGED: ${{ steps.filter.outputs.jitsi_openid || 'false' }}
           TWINBOX_DEV_WORKSPACE_CHANGED: ${{ steps.filter.outputs.twinbox_dev_workspace || 'false' }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-
-          images = [
-              {
-                  "image_name": "twinbox-manager-api",
-                  "package_name": "twinbox-manager-api",
-                  "context": ".",
-                  "dockerfile": "./manager-api/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=ref,event=tag",
-                      "type=sha",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-manager-worker",
-                  "package_name": "twinbox-manager-worker",
-                  "context": ".",
-                  "dockerfile": "./manager-worker/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=ref,event=tag",
-                      "type=sha",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-manager-web",
-                  "package_name": "twinbox-manager-web",
-                  "context": ".",
-                  "dockerfile": "./manager-web/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=ref,event=tag",
-                      "type=sha",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-portal",
-                  "package_name": "twinbox-portal",
-                  "context": "./portal",
-                  "dockerfile": "./portal/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}",
-                      "type=ref,event=tag",
-                      "type=sha",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-agents",
-                  "package_name": "twinbox-agents",
-                  "context": "./twinbox-agents",
-                  "dockerfile": "./twinbox-agents/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=raw,value=sha-${{ github.sha }},enable={{is_default_branch}}",
-                      "type=ref,event=tag",
-                      "type=sha",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-jitsi-openid",
-                  "package_name": "twinbox-manager-worker",
-                  "context": "./images/jitsi-openid",
-                  "dockerfile": "./images/jitsi-openid/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=jitsi-openid-latest,enable={{is_default_branch}}",
-                      "type=ref,event=tag,prefix=jitsi-openid-",
-                      "type=sha,prefix=jitsi-openid-sha-",
-                  ]),
-              },
-              {
-                  "image_name": "twinbox-dev-workspace",
-                  "package_name": "twinbox-dev-workspace",
-                  "context": "./images/twinbox-dev-workspace",
-                  "dockerfile": "./images/twinbox-dev-workspace/Dockerfile",
-                  "tags": "\n".join([
-                      "type=raw,value=latest,enable={{is_default_branch}}",
-                      "type=sha",
-                  ]),
-              },
-          ]
-
-          force_all = (
-              os.environ["EVENT_NAME"] == "workflow_dispatch"
-              or os.environ["GITHUB_REF"].startswith("refs/tags/v")
-              or os.environ["GITHUB_REF"] == "refs/heads/main"
-              or os.environ["FORCE_ALL"] == "true"
-          )
-
-          changed = {
-              "twinbox-manager-api": os.environ["MANAGER_API_CHANGED"] == "true",
-              "twinbox-manager-worker": os.environ["MANAGER_WORKER_CHANGED"] == "true",
-              "twinbox-manager-web": os.environ["MANAGER_WEB_CHANGED"] == "true",
-              "twinbox-portal": os.environ["PORTAL_CHANGED"] == "true",
-              "twinbox-agents": os.environ["TWINBOX_AGENTS_CHANGED"] == "true",
-              "twinbox-jitsi-openid": os.environ["JITSI_OPENID_CHANGED"] == "true",
-              "twinbox-dev-workspace": os.environ["TWINBOX_DEV_WORKSPACE_CHANGED"] == "true",
-          }
-
-          selected = images if force_all else [
-              image for image in images if changed[image["image_name"]]
-          ]
-          selected_names = [image["image_name"] for image in selected]
-          skipped_names = [
-              image["image_name"] for image in images if image["image_name"] not in selected_names
-          ]
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write(
-                  f"matrix={json.dumps({'include': selected}, separators=(',', ':'))}\n"
-              )
-              fh.write(f"should_publish={'true' if selected else 'false'}\n")
-              fh.write(
-                  f"selected_images={json.dumps(selected_names, separators=(',', ':'))}\n"
-              )
-              fh.write(
-                  f"skipped_images={json.dumps(skipped_names, separators=(',', ':'))}\n"
-              )
-          PY
+        run: python3 scripts/ci/image_matrix.py
 
   publish:
     needs: changes
@@ -254,12 +97,25 @@ jobs:
           primary=$(echo '${{ steps.meta.outputs.tags }}' | head -n 1)
           echo "tag=$primary" >> "$GITHUB_OUTPUT"
 
+      - name: Verify Node runtime version
+        if: matrix.node_runtime
+        run: python3 scripts/ci/check_node_runtime.py --image "${{ steps.primary-tag.outputs.tag }}" --source "${{ matrix.dockerfile }}"
+
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ steps.primary-tag.outputs.tag }}
           severity: 'HIGH,CRITICAL'
           exit-code: '0'
+          format: 'table'
+
+      - name: Block fixable Critical findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.primary-tag.outputs.tag }}
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
           format: 'table'
 
       - name: Push image

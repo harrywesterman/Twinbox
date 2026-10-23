@@ -1,5 +1,6 @@
 import json
 import os
+import runpy
 import subprocess
 from pathlib import Path
 
@@ -117,6 +118,6 @@ def test_web_image_includes_shared_backup_validation():
     repo = Path(__file__).resolve().parents[2]
     dockerfile = (repo / "manager-web/Dockerfile").read_text()
     assert "COPY lib/ /app/lib/" in dockerfile
-    workflow = (repo / ".github/workflows/docker-publish.yml").read_text()
-    web_matrix = workflow.split('"image_name": "twinbox-manager-web"', 1)[1].split("},", 1)[0]
-    assert '"context": "."' in web_matrix
+    catalog = runpy.run_path(str(repo / "scripts/ci/image_matrix.py"))["image_catalog"]("a" * 40)
+    web_image = next(image for image in catalog if image["image_name"] == "twinbox-manager-web")
+    assert web_image["context"] == "."

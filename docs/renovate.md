@@ -87,6 +87,7 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 |--------|----------|------------------|
 | Stable npm `devDependencies` and runtime `dependencies` patch/minor | Any time | Current version must be 1.0.0 or newer; release must be at least 14 days old |
 | Helm charts and container images patch/minor/digest | Any time | Current version must be 1.0.0 or newer, so `0.x` charts stay manual; release must be at least 7 days old |
+| Node image patch updates | Any time | Release must be at least 1 day old; required CI includes image scans |
 | Root `package-lock.json` maintenance | Any time | Root package contains development tooling only |
 | GitHub Actions digest updates in `verify.yml` | Any time | Initial digest pinning remains manual |
 | Security / vulnerability fixes | Any time | Fix must be at least 3 days old; auto-merges after `Verify / verify` succeeds |
@@ -113,11 +114,28 @@ Renovate reads GitHub Dependabot alerts and, for direct dependencies, OSV alerts
 `harrywesterman`. A fix that has been released for at least three days auto-merges once the
 required `Verify / verify` check succeeds.
 
-GitHub's dependency graph tracks npm dependencies (including transitive ones, via lockfiles)
-and Dockerfile/Compose images, so CVE-driven security fixes there are automatic. Helm charts
-and Argo CD `targetRevision` pins are not in the dependency graph, so they have no CVE feed;
-they still auto-merge through the ordinary Helm/image rule above whenever a non-major,
-non-`0.x` release is available.
+GitHub Dependabot alerts and Renovate's OSV integration cover supported package ecosystems;
+the OSV integration does not cover Docker image references. Do not assume Dockerfile, Compose,
+GitOps image, Helm chart, or Argo CD pins receive a CVE-triggered Renovate PR. Renovate still
+proposes ordinary image and chart version updates. Pull-request image scans block fixable
+Critical findings, and a scheduled scan reports newly disclosed findings in already-published
+Twinbox images.
+
+### Image vulnerability coverage
+
+The shared image inventory and path filters select affected images for pull-request builds.
+The required `Verify / verify` check reports High/Critical Trivy findings and blocks a PR
+when a fixable Critical finding is present. The publish workflow repeats the scan before
+pushing an image. Four Node runtime images also run `node --version` during CI to confirm
+that the built binary matches its patched Dockerfile pin; the Headwind bootstrap image is
+checked when its GitOps values change.
+
+`Monitor Published Images` rescans all seven published Twinbox images daily and can be run
+manually. It records image digests and High/Critical findings in one GitHub issue, updating
+only when findings change. A failed pull or scan fails the workflow and leaves the issue
+untouched. The monitor does not depend on a running Kubernetes cluster. Image scanners can
+miss vulnerabilities in bundled runtime code, so vendor runtime advisories still require
+review.
 
 ### Repository safeguards
 

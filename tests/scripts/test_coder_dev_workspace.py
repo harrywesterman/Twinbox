@@ -254,11 +254,13 @@ def test_netbird_and_opkssh_have_workspace_contracts():
 def test_ci_publishes_and_static_checks_dev_workspace():
     publish_text = PUBLISH_WORKFLOW.read_text(encoding="utf-8")
     verify_text = VERIFY_WORKFLOW.read_text(encoding="utf-8")
+    catalog_text = (WORKSPACE_ROOT / "scripts/ci/image_matrix.py").read_text(encoding="utf-8")
+    filter_text = (WORKSPACE_ROOT / ".github/image-build-filters.yml").read_text(encoding="utf-8")
 
-    assert "twinbox_dev_workspace" in publish_text
-    assert '"image_name": "twinbox-dev-workspace"' in publish_text
-    assert '"package_name": "twinbox-dev-workspace"' in publish_text
-    assert '"context": "./images/twinbox-dev-workspace"' in publish_text
+    assert "scripts/ci/image_matrix.py" in publish_text
+    assert "twinbox_dev_workspace:" in filter_text
+    assert '"twinbox-dev-workspace"' in catalog_text
+    assert '"./images/twinbox-dev-workspace"' in catalog_text
     assert "images/twinbox-dev-workspace/bin/tb" in verify_text
     assert "images/twinbox-dev-workspace/bin/twinbox-dev-startup" in verify_text
     assert "python -m py_compile images/twinbox-dev-workspace/bin/twinbox-ssh-login" in verify_text

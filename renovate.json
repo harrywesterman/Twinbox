@@ -209,6 +209,16 @@
       "automerge": true
     },
     {
+      "description": "Automerge patched Node image releases after one day",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "matchUpdateTypes": ["patch"],
+      "minimumReleaseAge": "1 day",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "internalChecksFilter": "strict",
+      "automerge": true
+    },
+    {
       "description": "Keep runtime lock file maintenance manual",
       "matchManagers": ["npm"],
       "matchUpdateTypes": ["lockFileMaintenance"],

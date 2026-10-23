@@ -1,0 +1,34 @@
+force_all:
+  - '.github/workflows/docker-publish.yml'
+  - '.github/workflows/verify.yml'
+  - '.github/image-build-filters.yml'
+  - 'scripts/ci/image_matrix.py'
+manager_api:
+  - 'manager-api/**'
+  - 'lib/**'
+  - 'categories/**'
+  - 'manager-web/src/assets/step-icons/**'
+manager_worker:
+  - 'manager-worker/**'
+  - 'config/**'
+  - 'lib/**'
+  - 'categories/**'
+  - 'infra/**'
+  - 'gitops/**'
+  - 'scripts/manager/**'
+  - 'scripts/get-talos-image-factory.sh'
+  - 'manager-web/src/assets/step-icons/**'
+manager_web:
+  - 'lib/**'
+  - 'manager-web/**'
+portal:
+  - 'portal/**'
+twinbox_agents:
+  - 'twinbox-agents/**'
+jitsi_openid:
+  - 'images/jitsi-openid/**'
+twinbox_dev_workspace:
+  - 'images/twinbox-dev-workspace/**'
+  - 'infra/coder/templates/twinbox-development/**'
+headwind_node:
+  - 'gitops/platform-apps/headwind-mdm/values.yaml'

@@ -8,9 +8,42 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  verify:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      verify_matrix: ${{ steps.select.outputs.verify_matrix }}
+      should_verify: ${{ steps.select.outputs.should_verify }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Detect changed image inputs
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        with:
+          filters: .github/image-build-filters.yml
+      - name: Select images
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          FORCE_ALL: ${{ steps.filter.outputs.force_all || 'false' }}
+          MANAGER_API_CHANGED: ${{ steps.filter.outputs.manager_api || 'false' }}
+          MANAGER_WORKER_CHANGED: ${{ steps.filter.outputs.manager_worker || 'false' }}
+          MANAGER_WEB_CHANGED: ${{ steps.filter.outputs.manager_web || 'false' }}
+          PORTAL_CHANGED: ${{ steps.filter.outputs.portal || 'false' }}
+          TWINBOX_AGENTS_CHANGED: ${{ steps.filter.outputs.twinbox_agents || 'false' }}
+          JITSI_OPENID_CHANGED: ${{ steps.filter.outputs.jitsi_openid || 'false' }}
+          TWINBOX_DEV_WORKSPACE_CHANGED: ${{ steps.filter.outputs.twinbox_dev_workspace || 'false' }}
+          HEADWIND_NODE_CHANGED: ${{ steps.filter.outputs.headwind_node || 'false' }}
+        run: python3 scripts/ci/image_matrix.py
+
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -103,3 +136,63 @@ jobs:
           node --test portal/test/*.mjs
           node --test twinbox-agents/test/*.mjs
           python -m pytest -q tests
+
+  image-scan:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.should_verify == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.verify_matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build changed image
+        if: matrix.dockerfile != ''
+        run: docker build -f "${{ matrix.dockerfile }}" -t "twinbox-ci-${{ matrix.image_name }}:${GITHUB_SHA}" "${{ matrix.context }}"
+      - name: Pull changed upstream image
+        if: matrix.dockerfile == ''
+        run: |
+          docker pull "${{ matrix.source_ref }}"
+          docker tag "${{ matrix.source_ref }}" "twinbox-ci-${{ matrix.image_name }}:${GITHUB_SHA}"
+      - name: Verify Node runtime version
+        if: matrix.node_runtime
+        run: |
+          source="${{ matrix.dockerfile }}"
+          if [[ -z "$source" ]]; then source=gitops/platform-apps/headwind-mdm/values.yaml; fi
+          python3 scripts/ci/check_node_runtime.py --image "twinbox-ci-${{ matrix.image_name }}:${GITHUB_SHA}" --source "$source"
+      - name: Report High and Critical findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: twinbox-ci-${{ matrix.image_name }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: table
+      - name: Block fixable Critical findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: twinbox-ci-${{ matrix.image_name }}:${{ github.sha }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+  verify:
+    needs: [changes, tests, image-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require tests and applicable image scans
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          IMAGE_SCAN_RESULT: ${{ needs.image-scan.result }}
+          SHOULD_VERIFY: ${{ needs.changes.outputs.should_verify }}
+        run: |
+          [[ "$CHANGES_RESULT" == success ]]
+          [[ "$TESTS_RESULT" == success ]]
+          if [[ "$GITHUB_EVENT_NAME" == pull_request && "$SHOULD_VERIFY" == true ]]; then
+            [[ "$IMAGE_SCAN_RESULT" == success ]]
+          else
+            [[ "$IMAGE_SCAN_RESULT" == success || "$IMAGE_SCAN_RESULT" == skipped ]]
+          fi

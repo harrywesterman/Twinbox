@@ -1,4 +1,4 @@
-FROM node:25-alpine AS build
+FROM node:24.22.1-alpine AS build
 WORKDIR /app/manager-web
 COPY manager-web/package*.json ./
 RUN npm install

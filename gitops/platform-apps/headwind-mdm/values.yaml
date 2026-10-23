@@ -30,7 +30,7 @@ resources:
     memory: 1536Mi
 
 bootstrap:
-  image: node:24.22.0-alpine
+  image: node:24.22.1-alpine
   resources:
     requests:
       cpu: 50m

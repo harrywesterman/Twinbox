@@ -207,17 +207,19 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
 
 def test_jitsi_openid_image_is_pinned_and_patched_for_room_scoped_short_lived_tokens():
     workflow_text = _read(DOCKER_PUBLISH_WORKFLOW)
+    catalog_text = _read(REPO_ROOT / "scripts/ci/image_matrix.py")
+    filter_text = _read(REPO_ROOT / ".github/image-build-filters.yml")
     dockerfile_text = _read(JITSI_IMAGE_DOCKERFILE)
     patch_text = _read(JITSI_IMAGE_PATCH)
 
-    assert "jitsi_openid:" in workflow_text
-    assert "images/jitsi-openid/**" in workflow_text
-    assert '"image_name": "twinbox-jitsi-openid"' in workflow_text
-    assert '"package_name": "twinbox-manager-worker"' in workflow_text
-    assert '"context": "./images/jitsi-openid"' in workflow_text
-    assert '"dockerfile": "./images/jitsi-openid/Dockerfile"' in workflow_text
-    assert "value=jitsi-openid-latest" in workflow_text
-    assert "type=sha,prefix=jitsi-openid-sha-" in workflow_text
+    assert "scripts/ci/image_matrix.py" in workflow_text
+    assert "jitsi_openid:" in filter_text
+    assert "images/jitsi-openid/**" in filter_text
+    assert '"twinbox-jitsi-openid"' in catalog_text
+    assert '"twinbox-manager-worker"' in catalog_text
+    assert '"./images/jitsi-openid/Dockerfile"' in catalog_text
+    assert "value=jitsi-openid-latest" in catalog_text
+    assert "type=sha,prefix=jitsi-openid-sha-" in catalog_text
     assert "Refresh pinned image references" in workflow_text
     assert "jitsi-openid-(?:latest|sha-[0-9a-f]{7})" in workflow_text
     assert "Verify Jitsi broker image is publicly pullable" in workflow_text
