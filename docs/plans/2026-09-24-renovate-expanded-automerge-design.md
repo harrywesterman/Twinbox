@@ -31,12 +31,14 @@ genuinely risky changes.
 - Stable npm `devDependencies` and runtime `dependencies` patch/minor updates (14-day soak,
   not on `0.x`).
 - Helm chart and container image patch/minor/digest updates (7-day soak, not on `0.x`).
-- Root tooling lock file maintenance and `verify.yml` action digests.
+- Root tooling lock file maintenance and action digests in the read-only `verify.yml` and
+  `deploy-pages.yml` workflows.
 - Security fixes, detected through GitHub Dependabot alerts plus OSV.
 
 Major versions, prereleases, `0.x` dependencies, everything in `config/pinned-defaults.sh`
 (the `github-releases` datasource: Talos, Kubernetes, Cilium, …), nested lock file
-maintenance, and workflow changes outside `verify.yml` remain manual.
+maintenance, and workflow changes outside the read-only workflows remain manual. The
+privileged `docker-publish.yml` workflow stays outside the digest auto-merge allowlist.
 
 ## Continuous scheduling
 

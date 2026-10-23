@@ -84,14 +84,18 @@ def test_only_root_tooling_lockfile_maintenance_is_automerged():
     assert nested_rule["automerge"] is False
 
 
-def test_only_verify_workflow_digest_updates_are_automerged():
+def test_read_only_workflow_digest_updates_are_automerged():
     config = _config()
-    rule = _rule(config, "Automerge Verify workflow action digests")
+    rule = _rule(config, "Automerge read-only workflow action digests")
 
     assert "helpers:pinGitHubActionDigests" in config["extends"]
     assert rule["matchManagers"] == ["github-actions"]
     assert rule["matchUpdateTypes"] == ["digest"]
-    assert rule["matchFileNames"] == [".github/workflows/verify.yml"]
+    assert set(rule["matchFileNames"]) == {
+        ".github/workflows/verify.yml",
+        ".github/workflows/deploy-pages.yml",
+    }
+    assert ".github/workflows/docker-publish.yml" not in rule["matchFileNames"]
     assert rule["automerge"] is True
 
 
@@ -102,7 +106,7 @@ def test_no_other_package_rule_enables_automerge():
         "Automerge stable npm development updates",
         "Automerge stable npm runtime updates",
         "Automerge root tooling lock file maintenance",
-        "Automerge Verify workflow action digests",
+        "Automerge read-only workflow action digests",
     }
 
     enabled = {
