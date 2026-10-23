@@ -492,6 +492,18 @@ def test_eurooffice_file_action_pins_the_audited_types_plugin_override():
     assert "node_modules/sprintf-js" not in lockfile["packages"]
 
 
+def test_eurooffice_file_action_uses_nextcloud_files_4_1_1_or_newer():
+    package = yaml.safe_load((EUROOFFICE_ACTION_DIR / "package.json").read_text())
+    lockfile = yaml.safe_load((EUROOFFICE_ACTION_DIR / "package-lock.json").read_text())
+    requested = package["dependencies"]["@nextcloud/files"]
+    locked = lockfile["packages"]["node_modules/@nextcloud/files"]["version"]
+
+    assert requested.startswith("^")
+    assert (4, 1, 1) <= tuple(map(int, requested[1:].split("."))) < (5, 0, 0)
+    assert lockfile["packages"][""]["dependencies"]["@nextcloud/files"] == requested
+    assert (4, 1, 1) <= tuple(map(int, locked.split("."))) < (5, 0, 0)
+
+
 def test_nextcloud_mail_uses_per_user_mailu_tokens():
     install_text = INSTALL_STEP.read_text(encoding="utf-8")
     values = yaml.safe_load(NEXTCLOUD_VALUES.read_text(encoding="utf-8"))
