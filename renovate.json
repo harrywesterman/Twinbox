@@ -173,6 +173,12 @@
   ],
   "packageRules": [
     {
+      "description": "Skip Forgejo 17.0.0 while upstream advises against upgrading",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["forgejo/forgejo"],
+      "allowedVersions": "!/^(?:v)?17\\.0\\.0$/"
+    },
+    {
       "description": "Pin typescript to 5.x in eurooffice-file-action: TS 7 (native) lacks the JS compiler API required by @nextcloud/vite-config",
       "matchPackageNames": ["typescript"],
       "matchFileNames": [
@@ -242,10 +248,7 @@
       "description": "Automerge read-only workflow action digests",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["digest"],
-      "matchFileNames": [
-        ".github/workflows/verify.yml",
-        ".github/workflows/deploy-pages.yml"
-      ],
+      "matchFileNames": [".github/workflows/verify.yml", ".github/workflows/deploy-pages.yml"],
       "automerge": true
     }
   ]

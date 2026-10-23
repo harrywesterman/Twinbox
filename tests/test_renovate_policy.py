@@ -99,6 +99,20 @@ def test_read_only_workflow_digest_updates_are_automerged():
     assert rule["automerge"] is True
 
 
+def test_unsafe_forgejo_release_is_excluded_without_blocking_later_versions():
+    config = _config()
+    rule = _rule(config, "Skip Forgejo 17.0.0 while upstream advises against upgrading")
+
+    assert rule["matchDatasources"] == ["docker"]
+    assert rule["matchPackageNames"] == ["forgejo/forgejo"]
+    pattern = rule["allowedVersions"]
+    assert pattern.startswith("!/") and pattern.endswith("/")
+    excluded = re.compile(pattern[2:-1])
+    assert excluded.fullmatch("17.0.0")
+    assert excluded.fullmatch("v17.0.0")
+    assert not excluded.fullmatch("17.0.1")
+
+
 def test_no_other_package_rule_enables_automerge():
     config = _config()
     allowed = {
