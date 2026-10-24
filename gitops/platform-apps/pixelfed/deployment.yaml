@@ -22,7 +22,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       initContainers:
         - name: prepare-pixelfed-storage
-          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.2-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           command:
             - sh
@@ -37,7 +37,7 @@ spec:
               mountPath: /var/www/bootstrap/cache
       containers:
         - name: pixelfed
-          image: ghcr.io/jippi/docker-pixelfed:v0.15.1-docker0-apache-8.4-bookworm
+          image: ghcr.io/jippi/docker-pixelfed:v0.15.2-docker0-apache-8.4-bookworm
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
