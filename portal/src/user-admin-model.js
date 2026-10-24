@@ -70,6 +70,11 @@ export function buildAdminNavigationItems({
         label: "Observability",
       },
       {
+        id: "admin-security",
+        path: "/admin/security",
+        label: "Beveiliging",
+      },
+      {
         id: "admin-cluster-updates",
         path: "/admin/updates",
         label: "Cluster updates",

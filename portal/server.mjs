@@ -1366,6 +1366,26 @@ app.get("/api/admin/apps/catalog", async (req, res) => {
   }
 });
 
+app.get("/api/admin/security", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  try {
+    res.json(await requestManagerJson("/api/security/overview?scope=published"));
+  } catch {
+    res.status(502).json({ error: "Security overview unavailable" });
+  }
+});
+
+app.get("/api/admin/security/images/:imageKey", async (req, res) => {
+  if (!requireAdminSession(req, res)) return;
+  if (!/^[a-z_]+$/.test(req.params.imageKey))
+    return res.status(400).json({ error: "invalid image" });
+  try {
+    res.json(await requestManagerJson(`/api/security/images/${req.params.imageKey}`));
+  } catch {
+    res.status(502).json({ error: "Security image details unavailable" });
+  }
+});
+
 app.get("/api/admin/observability", async (req, res) => {
   const session = requireAdminSession(req, res);
   if (!session) {

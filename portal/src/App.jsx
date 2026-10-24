@@ -10,6 +10,7 @@ import {
 
 import { buildAdminAppsViewModel } from "./admin-apps-model.js";
 import { buildObservabilityViewModel } from "./admin-observability-model.js";
+import AdminSecurityPage from "./AdminSecurityPage.jsx";
 import {
   buildAdminAppInstallPath,
   buildBundleInstallSummary,
@@ -4869,6 +4870,7 @@ export default function App() {
             onNavigate={navigate}
           />
         ) : null}
+        {route === "/admin/security" && isAdmin ? <AdminSecurityPage /> : null}
         {route === "/admin/updates" && isAdmin ? (
           <ClusterUpdatesAdminPage updatesState={clusterUpdatesAdminState} onNavigate={navigate} />
         ) : null}

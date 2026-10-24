@@ -148,6 +148,20 @@ Response: `{ start_vmid, vmid_block, start_ip, vip_ip, suggested_ips, gateway_ip
 
 Returns Proxmox node, VM, and storage resources. Storage entries include the host, storage id, active/enabled state, supported content, shared/local flag, and total/used/available bytes. The provisioning wizard only offers active storages whose content includes `images`.
 
+## Security overview
+
+`GET /api/security/overview?scope=published` returns the seven published Twinbox
+images' scan status, assessment counts, source freshness and subjects that have
+not been measured. `scope=runtime` explicitly reports `not_measured` until
+live image digests are collected. `GET /api/security/images/:imageKey` returns
+the complete assessed findings for an inventory key. Portal administrators use
+the authenticated `/api/admin/security` proxy and
+`/api/admin/security/images/:imageKey`.
+
+The optional `TWINBOX_SECURITY_GITHUB_TOKEN` grants the Manager API read-only
+access to GitHub Actions artifacts. No token or report source is provided by
+client query parameters.
+
 ## Internal
 
 All data is stored as JSON files under `manager-data/`:

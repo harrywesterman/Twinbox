@@ -51,6 +51,40 @@ def load_findings(root: Path, image_names: list[str]) -> list[dict]:
     return findings
 
 
+def load_assessed_findings(report_path: Path) -> list[dict]:
+    """Render the issue from the same full report consumed by the dashboard."""
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("schemaVersion") != 1 or len(report.get("images", [])) != 7:
+        raise ValueError("Incomplete security report")
+    return [
+        {
+            "name": image["logicalName"],
+            "digest": image["digest"],
+            "vulnerabilities": sorted(
+                [
+                    {
+                        "id": finding["vulnerabilityId"],
+                        "package": finding["packageName"],
+                        "installed": finding["installedVersion"],
+                        "fixed": ", ".join(finding["fixedVersions"]) or "none published",
+                        "severity": finding["originalSeverity"],
+                        "assessment": finding["status"],
+                    }
+                    for finding in image["findings"]
+                    if finding["originalSeverity"] in {"HIGH", "CRITICAL"}
+                    and finding["status"] != "not_affected"
+                ],
+                key=lambda finding: (
+                    finding["severity"] != "CRITICAL",
+                    finding["id"],
+                    finding["package"],
+                ),
+            ),
+        }
+        for image in report["images"]
+    ]
+
+
 def render_body(findings: list[dict]) -> str:
     fingerprint = hashlib.sha256(json.dumps(findings, sort_keys=True).encode("utf-8")).hexdigest()
     lines = [
@@ -63,6 +97,16 @@ def render_body(findings: list[dict]) -> str:
         f"Findings fingerprint: `{fingerprint}`",
         "",
     ]
+    lines.extend(
+        [
+            "Counts: "
+            + ", ".join(
+                f"{status}={sum(v.get('assessment') == status for item in findings for v in item['vulnerabilities'])}"
+                for status in ("affected", "needs_review")
+            ),
+            "",
+        ]
+    )
     for item in findings:
         if not item["vulnerabilities"]:
             continue
@@ -75,7 +119,7 @@ def render_body(findings: list[dict]) -> str:
                 else f"https://osv.dev/vulnerability/{identifier}"
             )
             lines.append(
-                f"- **{vuln['severity']}** [{identifier}]({link}) · `{vuln['package']}` "
+                f"- **{vuln['severity']}** {vuln.get('assessment', 'unreviewed')} [{identifier}]({link}) · `{vuln['package']}` "
                 f"`{vuln['installed']}` → `{vuln['fixed']}`"
             )
         remaining = len(item["vulnerabilities"]) - MAX_FINDINGS_PER_IMAGE
@@ -101,8 +145,10 @@ def gh(*args: str) -> str:
 
 
 def main() -> None:
+    root = Path(sys.argv[1])
+    assessed = Path(sys.argv[2]) if len(sys.argv) > 2 else None
     names = [image["image_name"] for image in image_catalog("")]
-    findings = load_findings(Path(sys.argv[1]), names)
+    findings = load_assessed_findings(assessed) if assessed else load_findings(root, names)
     repo = os.environ["GITHUB_REPOSITORY"]
     issues = json.loads(
         gh(

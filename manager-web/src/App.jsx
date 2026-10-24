@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import "./App.css";
 import BackupStorageFields from "./BackupStorageFields.jsx";
+import SecurityPreflight from "./SecurityPreflight.jsx";
 import ProxmoxBackupFields, { isPbsPlacementField } from "./ProxmoxBackupFields.jsx";
 import heroIllustrationUrl from "./assets/hero-illustration.svg";
 import {
@@ -2618,6 +2619,7 @@ function App() {
       ) : null}
 
       <main className="wizard-layout wizard-layout-minimal">
+        {!isInstallPhase && currentStep?.id === "provision-nodes" ? <SecurityPreflight /> : null}
         <section
           className={`wizard-workspace wizard-workspace-minimal ${isInstallPhase ? "wizard-workspace-install" : ""}`}
         >

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "debian-bookworm-zlib-minizip-not-built-2023-45853",
+      "vulnerabilityId": "CVE-2023-45853",
+      "packageName": "zlib1g",
+      "distro": "debian",
+      "release": "12",
+      "installedVersion": "1:1.2.13.dfsg-1",
+      "status": "not_affected",
+      "action": "no_action_required",
+      "sourceUrl": "https://security-tracker.debian.org/tracker/CVE-2023-45853",
+      "sourceSha256": "a097c052654594d2ea930b53ee1928aac6dab6f9242a7fee79c2883095276a13",
+      "rationale": "Debian records this Bookworm zlib source version as vulnerable but notes that contrib/minizip is not built and src:zlib does not produce the affected binary package. This exact installed zlib1g binary therefore does not include the vulnerable MiniZip code.",
+      "reviewedAt": "2026-10-24T00:00:00Z",
+      "expiresAt": "2026-11-24T00:00:00Z"
+    }
+  ]
+}

@@ -69,6 +69,8 @@ import {
   normalizeSecretBundle,
 } from "../../lib/secrets/schema.mjs";
 import { isClusterScopedStep } from "../../lib/step-scope.mjs";
+import { createSecurityReportLoader } from "./lib/security-report.js";
+import { buildSecurityOverview } from "./lib/security-overview.js";
 import {
   readItemRecord,
   resolveAttachmentPath,
@@ -83,6 +85,7 @@ const port = Number(process.env.MANAGER_API_PORT || 8080);
 const dataRoot = process.env.MANAGER_DATA_DIR || "/data";
 const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
 const dirs = buildDataDirs(dataRoot);
+const loadSecurityReport = createSecurityReportLoader(dataRoot);
 const dataFiles = buildDataFiles(dataRoot);
 const trustedSourceCidrs = parseTrustedCidrs(process.env.MANAGER_API_TRUSTED_CIDRS);
 
@@ -1366,6 +1369,30 @@ function parseSecretKeyPath(secretKeyPath) {
     item,
   });
 }
+
+app.get("/api/security/overview", async (req, res) => {
+  const scope = req.query.scope || "published";
+  if (!["published", "runtime"].includes(scope))
+    return res.status(400).json({ error: "invalid scope" });
+  const result = await loadSecurityReport();
+  const latestError =
+    result.latestRun && result.latestRun.status !== "completed"
+      ? `Latest security scan is ${result.latestRun.status}`
+      : result.latestRun?.conclusion !== "success" && result.latestRun
+        ? `Latest security scan failed (run ${result.latestRun.id})`
+        : null;
+  return res.json({
+    ...buildSecurityOverview(result.report, result.error || latestError, scope),
+    latestRun: result.latestRun,
+  });
+});
+
+app.get("/api/security/images/:imageKey", async (req, res) => {
+  const result = await loadSecurityReport();
+  const image = result.report?.images.find((item) => item.key === req.params.imageKey);
+  if (!image) return res.status(404).json({ error: "image not found" });
+  return res.json({ image, sourceError: result.error });
+});
 
 app.get("/api/health", (_, res) => {
   res.json({ ok: true, time: now(), image_tag: process.env.TWINBOX_IMAGE_TAG || "unknown" });

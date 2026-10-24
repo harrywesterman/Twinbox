@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Twinbox security assessment rules",
+  "type": "object",
+  "required": ["schemaVersion", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "vulnerabilityId", "packageName", "distro", "release", "installedVersion", "status", "action", "sourceUrl", "sourceSha256", "rationale", "reviewedAt", "expiresAt"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "vulnerabilityId": { "type": "string", "pattern": "^CVE-[0-9]{4}-[0-9]+$" },
+          "packageName": { "type": "string", "minLength": 1 },
+          "distro": { "type": "string", "minLength": 1 },
+          "release": { "type": "string", "minLength": 1 },
+          "installedVersion": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["not_affected"] },
+          "action": { "enum": ["no_action_required"] },
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "sourceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "rationale": { "type": "string", "minLength": 1 },
+          "reviewedAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
