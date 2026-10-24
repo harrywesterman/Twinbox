@@ -52,7 +52,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends nodejs \
   && mkdir -p /opt/twinbox/dev-tools
 
-COPY images/twinbox-dev-workspace/dev-tools/package.json images/twinbox-dev-workspace/dev-tools/package-lock.json /opt/twinbox/dev-tools/
+COPY dev-tools/package.json dev-tools/package-lock.json /opt/twinbox/dev-tools/
 RUN npm ci --omit=dev --prefix /opt/twinbox/dev-tools
 
 ENV PATH="/opt/twinbox/dev-tools/node_modules/.bin:${PATH}"
