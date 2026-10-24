@@ -1,0 +1,2 @@
+setuptools==84.2.1
+urllib3==2.8.0

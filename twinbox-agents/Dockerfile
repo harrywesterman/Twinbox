@@ -8,6 +8,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 RUN addgroup -S twinbox && adduser -S twinbox -G twinbox
+RUN npm_root="$(npm root -g)" \
+  && rm -rf "${npm_root}/npm" /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src

@@ -51,6 +51,8 @@ RUN cd /opt/twinbox/categories/apps/steps/install-nextcloud/eurooffice-file-acti
 
 RUN chmod +x ./scripts/manager/*.sh
 RUN chmod +x ./scripts/get-talos-image-factory.sh
+RUN npm_root="$(npm root -g)" \
+  && rm -rf "${npm_root}/npm" /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /opt/twinbox/manager-worker
-CMD ["npm", "start"]
+CMD ["node", "src/worker.js"]

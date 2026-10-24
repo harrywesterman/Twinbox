@@ -16,6 +16,8 @@ RUN apk update \
 COPY manager-api/package.json ./manager-api/package.json
 COPY manager-api/package-lock.json ./manager-api/package-lock.json
 RUN cd /opt/twinbox/manager-api && npm ci --omit=dev
+RUN npm_root="$(npm root -g)" \
+  && rm -rf "${npm_root}/npm" /usr/local/bin/npm /usr/local/bin/npx
 
 COPY lib ./lib
 COPY categories ./categories
@@ -25,4 +27,4 @@ COPY manager-api/src ./manager-api/src
 
 WORKDIR /opt/twinbox/manager-api
 EXPOSE 8080
-CMD ["npm", "start"]
+CMD ["node", "src/server.js"]

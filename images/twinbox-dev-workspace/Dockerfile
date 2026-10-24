@@ -52,8 +52,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends nodejs \
   && mkdir -p /opt/twinbox/dev-tools
 
-COPY dev-tools/package.json dev-tools/package-lock.json /opt/twinbox/dev-tools/
+COPY dev-tools/package.json dev-tools/package-lock.json dev-tools/requirements-security.txt /opt/twinbox/dev-tools/
 RUN npm ci --omit=dev --prefix /opt/twinbox/dev-tools
+RUN python3 -m pip install --no-cache-dir --upgrade -r /opt/twinbox/dev-tools/requirements-security.txt
 
 ENV PATH="/opt/twinbox/dev-tools/node_modules/.bin:${PATH}"
 

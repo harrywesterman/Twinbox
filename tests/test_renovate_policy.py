@@ -117,6 +117,7 @@ def test_no_other_package_rule_enables_automerge():
         "Automerge base image digest refreshes for Twinbox-owned Dockerfiles",
         "Automerge stable npm development updates",
         "Automerge stable npm runtime updates",
+        "Automerge stable Python security dependency updates after CI",
         "Automerge read-only workflow action digests",
     }
 
@@ -223,6 +224,17 @@ def test_npm_runtime_updates_automerge_non_major():
     assert rule["matchCurrentVersion"] == "!/^0/"
     assert rule["minimumReleaseAge"] == "14 days"
     assert rule["internalChecksFilter"] == "strict"
+    assert rule["automerge"] is True
+
+
+def test_python_security_requirements_are_monitored_and_automerge_after_ci():
+    config = _config()
+    assert "pip_requirements" in config["enabledManagers"]
+    rule = _rule(config, "Automerge stable Python security dependency updates after CI")
+    assert rule["matchManagers"] == ["pip_requirements"]
+    assert rule["matchDatasources"] == ["pypi"]
+    assert set(rule["matchUpdateTypes"]) == {"minor", "patch"}
+    assert rule["minimumReleaseAge"] == "3 days"
     assert rule["automerge"] is True
 
 

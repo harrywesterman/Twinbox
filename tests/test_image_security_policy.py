@@ -39,6 +39,28 @@ def test_runtime_version_check_rejects_old_or_different_image():
         validate_version((25, 9, 0), "v25.9.0")
 
 
+def test_node_service_images_remove_unused_global_npm_from_runtime():
+    commands = {
+        "manager-api/Dockerfile": 'CMD ["node", "src/server.js"]',
+        "manager-worker/Dockerfile": 'CMD ["node", "src/worker.js"]',
+        "portal/Dockerfile": 'CMD ["node", "server.mjs"]',
+        "twinbox-agents/Dockerfile": 'CMD ["node", "src/server.mjs"]',
+    }
+    for path, command in commands.items():
+        text = (ROOT / path).read_text(encoding="utf-8")
+        assert 'rm -rf "${npm_root}/npm" /usr/local/bin/npm /usr/local/bin/npx' in text
+        assert command in text
+    worker = (ROOT / "manager-worker/Dockerfile").read_text(encoding="utf-8")
+    assert worker.index("npm run build") < worker.index('rm -rf "${npm_root}/npm"')
+    workspace = (ROOT / "images/twinbox-dev-workspace/Dockerfile").read_text(encoding="utf-8")
+    assert "python3 -m pip install --no-cache-dir --upgrade -r" in workspace
+    requirements = (
+        ROOT / "images/twinbox-dev-workspace/dev-tools/requirements-security.txt"
+    ).read_text(encoding="utf-8")
+    assert "setuptools==84.2.1" in requirements
+    assert "urllib3==2.8.0" in requirements
+
+
 def test_shared_image_catalog_selects_changed_images_and_all_published_images():
     names = [image["image_name"] for image in image_catalog("a" * 40)]
     assert len(names) == len(set(names)) == 7

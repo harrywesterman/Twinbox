@@ -33,6 +33,7 @@
     "dockerfile",
     "docker-compose",
     "npm",
+    "pip_requirements",
     "github-actions",
     "custom.regex"
   ],
@@ -292,6 +293,15 @@
       "matchUpdateTypes": ["minor", "patch"],
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "14 days",
+      "internalChecksFilter": "strict",
+      "automerge": true
+    },
+    {
+      "description": "Automerge stable Python security dependency updates after CI",
+      "matchManagers": ["pip_requirements"],
+      "matchDatasources": ["pypi"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "3 days",
       "internalChecksFilter": "strict",
       "automerge": true
     },
