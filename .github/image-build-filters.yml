@@ -5,6 +5,7 @@ force_all:
   - 'scripts/ci/image_matrix.py'
 manager_api:
   - 'manager-api/**'
+  - 'config/**'
   - 'lib/**'
   - 'categories/**'
   - 'manager-web/src/assets/step-icons/**'

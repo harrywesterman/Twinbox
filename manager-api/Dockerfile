@@ -14,7 +14,8 @@ RUN apk update \
   && rm -rf /var/cache/apk/*
 
 COPY manager-api/package.json ./manager-api/package.json
-RUN cd /opt/twinbox/manager-api && npm install --omit=dev
+COPY manager-api/package-lock.json ./manager-api/package-lock.json
+RUN cd /opt/twinbox/manager-api && npm ci --omit=dev
 
 COPY lib ./lib
 COPY categories ./categories

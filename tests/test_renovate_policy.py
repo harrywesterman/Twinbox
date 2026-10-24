@@ -69,19 +69,14 @@ def test_only_stable_npm_development_updates_are_automerged():
     assert rule["automerge"] is True
 
 
-def test_only_root_tooling_lockfile_maintenance_is_automerged():
+def test_all_lockfile_maintenance_is_automerged_after_ci_and_release_age():
     config = _config()
-    root_rule = _rule(config, "Automerge root tooling lock file maintenance")
-    nested_rule = _rule(config, "Keep runtime lock file maintenance manual")
+    maintenance = config["lockFileMaintenance"]
 
-    assert config["lockFileMaintenance"]["enabled"] is True
-    assert root_rule["matchUpdateTypes"] == ["lockFileMaintenance"]
-    assert root_rule["matchFileNames"] == ["package-lock.json"]
-    assert root_rule["groupName"] == "Root tooling lock file maintenance"
-    assert root_rule["automerge"] is True
-    assert nested_rule["matchUpdateTypes"] == ["lockFileMaintenance"]
-    assert nested_rule["matchFileNames"] == ["**/package-lock.json", "!package-lock.json"]
-    assert nested_rule["automerge"] is False
+    assert maintenance["enabled"] is True
+    assert maintenance["schedule"] == []
+    assert maintenance["minimumReleaseAge"] == "3 days"
+    assert maintenance["automerge"] is True
 
 
 def test_read_only_workflow_digest_updates_are_automerged():
@@ -118,9 +113,10 @@ def test_no_other_package_rule_enables_automerge():
     allowed = {
         "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
         "Automerge patched Node image releases after one day",
+        "Automerge patch and minor updates for CLI tools bundled in Twinbox images",
+        "Automerge base image digest refreshes for Twinbox-owned Dockerfiles",
         "Automerge stable npm development updates",
         "Automerge stable npm runtime updates",
-        "Automerge root tooling lock file maintenance",
         "Automerge read-only workflow action digests",
     }
 
@@ -152,6 +148,45 @@ def test_node_image_patch_updates_have_one_day_wait_without_major_automerge():
     assert rule["minimumReleaseAge"] == "1 day"
     assert rule["internalChecksFilter"] == "strict"
     assert rule["automerge"] is True
+
+
+def test_image_bundled_cli_and_base_image_updates_are_scanned_before_automerge():
+    config = _config()
+    cli_rule = _rule(
+        config, "Automerge patch and minor updates for CLI tools bundled in Twinbox images"
+    )
+    assert set(cli_rule["matchDatasources"]) == {"github-releases", "helm"}
+    assert set(cli_rule["matchUpdateTypes"]) == {"minor", "patch"}
+    assert cli_rule["minimumReleaseAge"] == "3 days"
+    assert cli_rule["automerge"] is True
+
+    image_rule = _rule(
+        config, "Automerge base image digest refreshes for Twinbox-owned Dockerfiles"
+    )
+    assert image_rule["matchManagers"] == ["dockerfile"]
+    assert "manager-api/Dockerfile" in image_rule["matchFileNames"]
+    assert "images/twinbox-dev-workspace/Dockerfile" in image_rule["matchFileNames"]
+    assert image_rule["pinDigests"] is True
+    assert set(image_rule["matchUpdateTypes"]) == {"pinDigest", "digest"}
+    assert image_rule["automerge"] is True
+
+    dockerfile_manager = next(
+        manager
+        for manager in config["customManagers"]
+        if manager["description"]
+        == "Pinned CLI releases included in Twinbox development workspace images"
+    )
+    dockerfile_patterns = "\n".join(dockerfile_manager["matchStrings"])
+    for dep_name in (
+        "coder/code-server",
+        "kubernetes/kubernetes",
+        "helm/helm",
+        "derailed/k9s",
+        "siderolabs/talos",
+        "opentofu/opentofu",
+        "openpubkey/opkssh",
+    ):
+        assert f"(?<depName>{dep_name})" in dockerfile_patterns
 
 
 def test_updates_run_at_any_time_without_a_schedule_window():

@@ -26,11 +26,23 @@ def test_dev_workspace_image_contains_browser_agent_tooling():
     text = WORKSPACE_IMAGE.read_text(encoding="utf-8")
 
     assert re.search(r"^FROM python:\d+\.\d+-slim-bookworm$", text, re.MULTILINE)
-    assert "npm install -g @openai/codex opencode-ai playwright" in text
+    assert "npm ci --omit=dev --prefix /opt/twinbox/dev-tools" in text
+    assert "dev-tools/package-lock.json" in text
+    assert "@openai/codex" not in text
     assert "npx playwright install --with-deps chromium" in text
     assert "https://cli.github.com/packages/githubcli-archive-keyring.gpg" in text
     assert "apt-get install -y --no-install-recommends gh" in text
-    assert "ARG CODE_SERVER_VERSION=4.141.0" in text
+    assert "ARG CODE_SERVER_VERSION=4.143.1" in text
+    pinned_defaults = (WORKSPACE_ROOT / "config" / "pinned-defaults.sh").read_text(encoding="utf-8")
+    for name in ("KUBECTL", "HELM", "K9S", "TALOS", "OPENTOFU"):
+        version = re.search(rf"^PINNED_{name}_VERSION=(\S+)$", pinned_defaults, re.MULTILINE)
+        assert version is not None
+        assert f"ARG {name}_VERSION={version.group(1)}" in text
+    assert "ARG OPKSSH_VERSION=0.19.1" in text
+    assert (
+        "ARG OPKSSH_SHA256_AMD64=8a968688c940229327ff4dac470bbfbbd50cd6a57b301644d8a529d9749bf6be"
+        in text
+    )
     assert "ARG SHELL_QUOTE_VERSION=1.11.0" in text
     assert (
         "ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea"

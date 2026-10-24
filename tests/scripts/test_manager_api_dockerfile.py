@@ -10,6 +10,8 @@ def test_manager_api_image_includes_shared_secret_runtime_without_bw():
     assert re.search(r"^FROM node:\d+\.\d+\.\d+-alpine", text, re.MULTILINE)
     assert "COPY lib ./lib" in text
     assert "COPY manager-api/package.json ./manager-api/package.json" in text
+    assert "COPY manager-api/package-lock.json ./manager-api/package-lock.json" in text
     assert "apk add --no-cache ca-certificates curl iproute2 iputils-ping" in text
-    assert "npm install --omit=dev" in text
+    assert "npm ci --omit=dev" in text
+    assert "npm install --omit=dev" not in text
     assert "bitwarden" not in text.lower()

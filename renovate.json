@@ -13,7 +13,10 @@
   "branchConcurrentLimit": 16,
   "assignees": ["harrywesterman"],
   "lockFileMaintenance": {
-    "enabled": true
+    "enabled": true,
+    "schedule": [],
+    "minimumReleaseAge": "3 days",
+    "automerge": true
   },
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
@@ -50,6 +53,21 @@
     "managerFilePatterns": ["/(^|\\/)package\\.json$/"]
   },
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pinned CLI releases included in Twinbox development workspace images",
+      "managerFilePatterns": ["/images/twinbox-dev-workspace/Dockerfile$/"],
+      "datasourceTemplate": "github-releases",
+      "matchStrings": [
+        "# renovate: depName=(?<depName>coder/code-server)\\nARG CODE_SERVER_VERSION=(?<currentValue>[0-9.]+)",
+        "# renovate: depName=(?<depName>kubernetes/kubernetes)\\nARG KUBECTL_VERSION=(?<currentValue>v?[0-9.]+)",
+        "# renovate: depName=(?<depName>helm/helm)\\nARG HELM_VERSION=(?<currentValue>v?[0-9.]+)",
+        "# renovate: depName=(?<depName>derailed/k9s)\\nARG K9S_VERSION=(?<currentValue>v?[0-9.]+)",
+        "# renovate: depName=(?<depName>siderolabs/talos)\\nARG TALOS_VERSION=(?<currentValue>v?[0-9.]+)",
+        "# renovate: depName=(?<depName>opentofu/opentofu)\\nARG OPENTOFU_VERSION=(?<currentValue>v?[0-9.]+)",
+        "# renovate: depName=(?<depName>openpubkey/opkssh)\\nARG OPKSSH_VERSION=(?<currentValue>[0-9.]+)"
+      ]
+    },
     {
       "customType": "regex",
       "description": "PINNED_*_VERSION vars in config/pinned-defaults.sh",
@@ -219,12 +237,43 @@
       "automerge": true
     },
     {
-      "description": "Keep runtime lock file maintenance manual",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["lockFileMaintenance"],
-      "matchFileNames": ["**/package-lock.json", "!package-lock.json"],
-      "groupName": "Runtime lock file maintenance",
-      "automerge": false
+      "description": "Automerge patch and minor updates for CLI tools bundled in Twinbox images",
+      "matchDatasources": ["github-releases", "helm"],
+      "matchPackageNames": [
+        "coder/code-server",
+        "coder",
+        "derailed/k9s",
+        "helm/helm",
+        "kubernetes/kubernetes",
+        "openpubkey/opkssh",
+        "opentofu/opentofu",
+        "siderolabs/talos"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "minimumReleaseAge": "3 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "internalChecksFilter": "strict",
+      "automerge": true
+    },
+    {
+      "description": "Automerge base image digest refreshes for Twinbox-owned Dockerfiles",
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": [
+        "manager-api/Dockerfile",
+        "manager-web/Dockerfile",
+        "manager-worker/Dockerfile",
+        "portal/Dockerfile",
+        "twinbox-agents/Dockerfile",
+        "images/jitsi-openid/Dockerfile",
+        "images/twinbox-dev-workspace/Dockerfile"
+      ],
+      "matchUpdateTypes": ["pinDigest", "digest"],
+      "pinDigests": true,
+      "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "internalChecksFilter": "strict",
+      "automerge": true
     },
     {
       "description": "Automerge stable npm development updates",
@@ -244,14 +293,6 @@
       "matchCurrentVersion": "!/^0/",
       "minimumReleaseAge": "14 days",
       "internalChecksFilter": "strict",
-      "automerge": true
-    },
-    {
-      "description": "Automerge root tooling lock file maintenance",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["lockFileMaintenance"],
-      "matchFileNames": ["package-lock.json"],
-      "groupName": "Root tooling lock file maintenance",
       "automerge": true
     },
     {

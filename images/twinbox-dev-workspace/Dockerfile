@@ -1,16 +1,23 @@
 FROM python:3.15-slim-bookworm
 
 ARG TARGETARCH=amd64
-ARG CODE_SERVER_VERSION=4.141.0
+# renovate: depName=coder/code-server
+ARG CODE_SERVER_VERSION=4.143.1
 ARG SHELL_QUOTE_VERSION=1.11.0
 ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea
-ARG KUBECTL_VERSION=v1.36.4
-ARG HELM_VERSION=v4.2.4
+# renovate: depName=kubernetes/kubernetes
+ARG KUBECTL_VERSION=v1.37.1
+# renovate: depName=helm/helm
+ARG HELM_VERSION=v4.3.1
+# renovate: depName=derailed/k9s
 ARG K9S_VERSION=v0.51.0
-ARG TALOS_VERSION=v1.13.9
-ARG OPENTOFU_VERSION=v1.12.6
-ARG OPKSSH_VERSION=0.15.0
-ARG OPKSSH_SHA256_AMD64=8fab6eb86031d80da81e87817b3ede39f5cbc0ab0a4a9bf679312732c152d886
+# renovate: depName=siderolabs/talos
+ARG TALOS_VERSION=v1.14.4
+# renovate: depName=opentofu/opentofu
+ARG OPENTOFU_VERSION=v1.13.2
+# renovate: depName=openpubkey/opkssh
+ARG OPKSSH_VERSION=0.19.1
+ARG OPKSSH_SHA256_AMD64=8a968688c940229327ff4dac470bbfbbd50cd6a57b301644d8a529d9749bf6be
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -43,8 +50,14 @@ RUN apt-get update \
     >/etc/apt/sources.list.d/nodesource.list \
   && apt-get update \
   && apt-get install -y --no-install-recommends nodejs \
-  && npm install -g @openai/codex opencode-ai playwright \
-  && npx playwright install --with-deps chromium \
+  && mkdir -p /opt/twinbox/dev-tools
+
+COPY images/twinbox-dev-workspace/dev-tools/package.json images/twinbox-dev-workspace/dev-tools/package-lock.json /opt/twinbox/dev-tools/
+RUN npm ci --omit=dev --prefix /opt/twinbox/dev-tools
+
+ENV PATH="/opt/twinbox/dev-tools/node_modules/.bin:${PATH}"
+
+RUN npx playwright install --with-deps chromium \
   && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
   && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \

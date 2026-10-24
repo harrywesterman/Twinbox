@@ -62,6 +62,7 @@ jobs:
             manager-worker/package-lock.json
             portal/package-lock.json
             twinbox-agents/package-lock.json
+            images/twinbox-dev-workspace/dev-tools/package-lock.json
 
       - name: Setup Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -79,6 +80,7 @@ jobs:
           npm ci --prefix manager-worker
           npm ci --prefix portal
           npm ci --prefix twinbox-agents
+          npm ci --omit=dev --prefix images/twinbox-dev-workspace/dev-tools
 
       - name: Audit dependencies
         run: |
@@ -88,6 +90,7 @@ jobs:
           npm audit --audit-level=high --prefix manager-worker
           npm audit --audit-level=high --prefix portal
           npm audit --audit-level=high --prefix twinbox-agents
+          npm audit --audit-level=high --prefix images/twinbox-dev-workspace/dev-tools
 
       - name: Lint and format check
         run: |

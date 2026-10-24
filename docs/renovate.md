@@ -88,7 +88,7 @@ Renovate monitors the following Argo CD applications in `gitops/apps/`, `gitops/
 | Stable npm `devDependencies` and runtime `dependencies` patch/minor | Any time | Current version must be 1.0.0 or newer; release must be at least 14 days old |
 | Helm charts and container images patch/minor/digest | Any time | Current version must be 1.0.0 or newer, so `0.x` charts stay manual; release must be at least 7 days old |
 | Node image patch updates | Any time | Release must be at least 1 day old; required CI includes image scans |
-| Root `package-lock.json` maintenance | Any time | Root package contains development tooling only |
+| All npm lockfile maintenance | Any time | Wait 3 days; auto-merges only after `Verify / verify` succeeds |
 | GitHub Actions digest updates in `verify.yml` | Any time | Initial digest pinning remains manual |
 | Security / vulnerability fixes | Any time | Fix must be at least 3 days old; auto-merges after `Verify / verify` succeeds |
 
@@ -100,10 +100,7 @@ continuously.
 The following updates are never auto-merged (a PR is still opened for review):
 
 - Major versions, prereleases, and any dependency currently on `0.x`
-- Talos, Kubernetes, Cilium, and all other versions in `config/pinned-defaults.sh` (the
-  `github-releases` datasource)
-- Nested lockfile maintenance for Manager API/Web/Worker, Portal, Twinbox Agents, and app
-  actions
+- Major versions, prereleases, `0.x` tools, and cluster-level chart pins such as Cilium
 - GitHub Actions changes outside `.github/workflows/verify.yml`, including the image publish
   and Pages workflows
 - Vendored Helm charts committed under an application (for example the Authentik dependency
@@ -113,6 +110,17 @@ Renovate reads GitHub Dependabot alerts and, for direct dependencies, OSV alerts
 (`osvVulnerabilityAlerts`); it labels the security PRs `security` and assigns
 `harrywesterman`. A fix that has been released for at least three days auto-merges once the
 required `Verify / verify` check succeeds.
+
+Every npm lockfile receives automatic maintenance without a calendar window. This refreshes
+transitive dependencies within the existing package ranges; updates wait three days and
+auto-merge only after tests and any applicable image scan pass. Major dependency changes stay
+reviewable. The Manager API image uses `npm ci` with its committed lockfile, so the versions
+checked by CI are also the versions installed into the published image.
+
+Renovate also tracks GitHub releases for selected CLI binaries bundled in Twinbox images and
+base-image digests for Twinbox-owned Dockerfiles. Those PRs run the affected image build and
+Trivy scan before auto-merge, including operating-system and Go-binary fixes where upstream
+publishes a new base or tool release.
 
 GitHub Dependabot alerts and Renovate's OSV integration cover supported package ecosystems;
 the OSV integration does not cover Docker image references. Do not assume Dockerfile, Compose,

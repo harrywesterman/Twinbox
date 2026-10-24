@@ -49,6 +49,19 @@ def test_shared_image_catalog_selects_changed_images_and_all_published_images():
         "twinbox-portal"
     ]
     assert outputs["should_publish"] == "true"
+    outputs = workflow_outputs(
+        "a" * 40,
+        "pull_request",
+        "refs/pull/2/merge",
+        {"manager_api": True, "manager_worker": True},
+    )
+    assert [item["image_name"] for item in json.loads(outputs["verify_matrix"])["include"]] == [
+        "twinbox-manager-api",
+        "twinbox-manager-worker",
+    ]
+    filters = (ROOT / ".github/image-build-filters.yml").read_text(encoding="utf-8")
+    manager_api_filter = filters.split("manager_api:", 1)[1].split("manager_worker:", 1)[0]
+    assert "'config/**'" in manager_api_filter
     outputs = workflow_outputs("a" * 40, "push", "refs/heads/main", {})
     assert len(json.loads(outputs["matrix"])["include"]) == 7
     outputs = workflow_outputs(
