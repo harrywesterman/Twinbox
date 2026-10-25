@@ -69,14 +69,16 @@ def test_only_stable_npm_development_updates_are_automerged():
     assert rule["automerge"] is True
 
 
-def test_all_lockfile_maintenance_is_automerged_after_ci_and_release_age():
+def test_lockfile_maintenance_uses_renovate_automerge_for_internal_checks():
     config = _config()
     maintenance = config["lockFileMaintenance"]
 
+    assert config["platformAutomerge"] is True
     assert maintenance["enabled"] is True
     assert maintenance["schedule"] == []
     assert maintenance["minimumReleaseAge"] == "3 days"
     assert maintenance["automerge"] is True
+    assert maintenance["platformAutomerge"] is False
 
 
 def test_read_only_workflow_digest_updates_are_automerged():

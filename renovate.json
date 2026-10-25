@@ -16,7 +16,8 @@
     "enabled": true,
     "schedule": [],
     "minimumReleaseAge": "3 days",
-    "automerge": true
+    "automerge": true,
+    "platformAutomerge": false
   },
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
