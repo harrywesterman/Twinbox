@@ -22,7 +22,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: initialize-config
-          image: ghcr.io/euro-office/documentserver:v9.3.6
+          image: ghcr.io/euro-office/documentserver:v9.3.7
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -46,7 +46,7 @@ spec:
               mountPath: /mnt/eurooffice-data
       containers:
         - name: eurooffice
-          image: ghcr.io/euro-office/documentserver:v9.3.6
+          image: ghcr.io/euro-office/documentserver:v9.3.7
           imagePullPolicy: IfNotPresent
           env:
             - name: JWT_ENABLED
