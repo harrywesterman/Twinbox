@@ -24,7 +24,7 @@ def test_cve_pins_are_full_patched_versions_in_both_build_and_runtime_stages():
         text = (ROOT / path).read_text(encoding="utf-8")
         assert f"FROM node:{version}-alpine" in text
         assert declared_version(ROOT / path) == tuple(map(int, version.split(".")))
-    assert declared_version(ROOT / "gitops/platform-apps/headwind-mdm/values.yaml") == (24, 22, 1)
+    assert declared_version(ROOT / "gitops/platform-apps/headwind-mdm/values.yaml") == (26, 12, 1)
     assert "FROM nginx:" in (ROOT / "manager-web/Dockerfile").read_text(encoding="utf-8")
 
 
