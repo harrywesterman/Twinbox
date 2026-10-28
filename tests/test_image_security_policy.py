@@ -14,10 +14,10 @@ from published_image_issue import decide_issue, load_findings, render_body  # no
 
 def test_cve_pins_are_full_patched_versions_in_both_build_and_runtime_stages():
     expected = {
-        "manager-api/Dockerfile": "24.22.1",
+        "manager-api/Dockerfile": "26.12.1",
         "manager-worker/Dockerfile": "26.12.1",
-        "manager-web/Dockerfile": "24.22.1",
-        "portal/Dockerfile": "24.22.1",
+        "manager-web/Dockerfile": "26.12.1",
+        "portal/Dockerfile": "26.12.1",
         "twinbox-agents/Dockerfile": "26.12.1",
     }
     for path, version in expected.items():
