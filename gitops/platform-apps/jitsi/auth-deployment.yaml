@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: auth-jitsi
-          image: ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-de3d603
+          image: ghcr.io/harrywesterman/twinbox-manager-worker:jitsi-openid-sha-1537005
           imagePullPolicy: Always
           envFrom:
             - secretRef:
