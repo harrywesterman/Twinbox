@@ -20,7 +20,7 @@ spec:
       sources:
         - repoURL: oci://ghcr.io/element-hq/ess-helm/matrix-stack
           path: .
-          targetRevision: "26.10.3"
+          targetRevision: "26.10.4"
           helm:
             releaseName: ess
             valueFiles:
