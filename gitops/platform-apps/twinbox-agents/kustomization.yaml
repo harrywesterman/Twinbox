@@ -13,4 +13,4 @@ resources:
 
 images:
   - name: ghcr.io/harrywesterman/twinbox-agents
-    newTag: sha-ad65ec3
+    newTag: sha-aac13c9
