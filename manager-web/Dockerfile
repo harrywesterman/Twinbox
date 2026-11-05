@@ -6,7 +6,7 @@ COPY manager-web/ .
 COPY lib/ /app/lib/
 RUN npm run build
 
-FROM nginx:1.31.7-alpine
+FROM nginx:1.31.8-alpine
 RUN apk upgrade --no-cache
 COPY manager-web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/manager-web/dist /usr/share/nginx/html
