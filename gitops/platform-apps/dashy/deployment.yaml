@@ -19,7 +19,7 @@ spec:
     spec:
       initContainers:
         - name: copy-item-icons
-          image: ghcr.io/harrywesterman/twinbox-manager-worker:sha-61df75d
+          image: ghcr.io/harrywesterman/twinbox-manager-worker:sha-ad65ec3
           imagePullPolicy: Always
           command:
             - sh
