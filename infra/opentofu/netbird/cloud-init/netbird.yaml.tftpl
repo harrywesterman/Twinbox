@@ -29,12 +29,12 @@ write_files:
       ADMIN_TOKEN_EXPIRE_DAYS=${admin_token_expire_days}
       OPKSSH_ISSUER_URL=${opkssh_issuer_url}
       OPKSSH_CLIENT_ID=${opkssh_client_id}
-  - path: /root/bootstrap-netbird.sh
-    permissions: "0700"
+  - path: /root/bootstrap-netbird.sh.gz.b64
+    permissions: "0600"
     content: |
       ${indent(6, netbird_bootstrap_script)}
-  - path: /root/configure-netbird-crowdsec.py
-    permissions: "0700"
+  - path: /root/configure-netbird-crowdsec.py.gz.b64
+    permissions: "0600"
     content: |
       ${indent(6, crowdsec_helper_script)}
 
@@ -44,6 +44,16 @@ runcmd:
   - ufw allow 443/tcp
   - ufw allow 3478/udp
   - ufw --force enable
+  # Hetzner caps user_data at 32 KiB, so both scripts are shipped gzip+base64
+  # encoded and decoded here before use.
+  - |
+    set -euo pipefail
+    base64 -d /root/bootstrap-netbird.sh.gz.b64 | gunzip > /root/bootstrap-netbird.sh
+    chmod 0700 /root/bootstrap-netbird.sh
+    rm -f /root/bootstrap-netbird.sh.gz.b64
+    base64 -d /root/configure-netbird-crowdsec.py.gz.b64 | gunzip > /root/configure-netbird-crowdsec.py
+    chmod 0700 /root/configure-netbird-crowdsec.py
+    rm -f /root/configure-netbird-crowdsec.py.gz.b64
 %{ if opkssh_issuer_url != "" && opkssh_client_id != "" }
   - |
     set -euo pipefail

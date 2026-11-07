@@ -6299,6 +6299,8 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
 def test_netbird_bastion_tofu_workdir_ships_crowdsec_helper():
     run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
     locals_text = NETBIRD_MODULE_LOCALS.read_text(encoding="utf-8")
+    main_text = NETBIRD_MODULE_MAIN.read_text(encoding="utf-8")
+    cloud_init_text = NETBIRD_CLOUD_INIT.read_text(encoding="utf-8")
 
     # The step copies the module into a scratch workdir and runs tofu from
     # there, so ${path.module} is that workdir, not the repo. Every file() the
@@ -6311,6 +6313,21 @@ def test_netbird_bastion_tofu_workdir_ships_crowdsec_helper():
     assert (
         'fileexists("${path.module}/cloud-init/netbird-bastion-bootstrap-template.sh")'
         in locals_text
+    )
+
+    # Hetzner caps user_data at 32 KiB; the embedded scripts are shipped
+    # gzip+base64 encoded and decoded by cloud-init before use.
+    assert "base64gzip(file(local.bootstrap_script_path))" in main_text
+    assert "base64gzip(file(local.crowdsec_helper_path))" in main_text
+    assert "bootstrap-netbird.sh.gz.b64" in cloud_init_text
+    assert "configure-netbird-crowdsec.py.gz.b64" in cloud_init_text
+    assert (
+        "base64 -d /root/bootstrap-netbird.sh.gz.b64 | gunzip > /root/bootstrap-netbird.sh"
+        in cloud_init_text
+    )
+    assert (
+        "base64 -d /root/configure-netbird-crowdsec.py.gz.b64 | gunzip > /root/configure-netbird-crowdsec.py"
+        in cloud_init_text
     )
 
 
