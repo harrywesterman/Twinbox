@@ -2,7 +2,7 @@ FROM python:3.15-slim-bookworm
 
 ARG TARGETARCH=amd64
 # renovate: depName=coder/code-server
-ARG CODE_SERVER_VERSION=4.143.1
+ARG CODE_SERVER_VERSION=4.144.0
 ARG SHELL_QUOTE_VERSION=1.11.0
 ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea
 # renovate: depName=kubernetes/kubernetes
