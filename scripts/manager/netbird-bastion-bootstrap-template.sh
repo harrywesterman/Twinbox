@@ -623,6 +623,9 @@ updates = {
     "NB_PROXY_ACME_CHALLENGE_TYPE": "tls-alpn-01",
     "NB_PROXY_CERTIFICATE_DIRECTORY": "/certs",
     "NB_PROXY_WILDCARD_CERT_DIR": "/wildcard-certs",
+    # Advertise the Private capability so NetBird allows Proxy Cluster targets
+    # (used by the netbird coalescing fallback service) and NetBird-Only Access.
+    "NB_PROXY_PRIVATE": "true",
 }
 seen = set()
 out = []

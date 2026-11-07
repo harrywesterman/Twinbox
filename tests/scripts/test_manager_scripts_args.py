@@ -6508,6 +6508,9 @@ def test_netbird_cloud_init_uses_exact_netbird_cert_and_tcp_passthrough():
     assert "traefik.http.serverstransports.proxy-insecure" not in text
     assert "NB_PROXY_ACME_CERTIFICATES" in text
     assert '"true"' in text
+    # NetBird only allows Proxy Cluster targets (used by the netbird
+    # coalescing fallback) on clusters that advertise the Private capability.
+    assert '"NB_PROXY_PRIVATE": "true"' in text
 
 
 def test_beszel_install_configures_pocketbase_oauth_options():
