@@ -301,7 +301,11 @@ def configure(install_dir: Path) -> None:
             shutil.copy2(path, backup_dir / path.name)
     crowdsec_config = install_dir / "crowdsec"
     if crowdsec_config.is_dir():
-        shutil.copytree(crowdsec_config, backup_dir / "crowdsec")
+        # The CrowdSec hub links scenarios/parsers into the container image
+        # (/etc/crowdsec/hub/...), so these are dangling symlinks on the host.
+        # Preserve the links instead of following them, or copytree fails with
+        # "No such file or directory".
+        shutil.copytree(crowdsec_config, backup_dir / "crowdsec", symlinks=True)
 
     write_private(
         dot_env_path,

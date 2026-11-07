@@ -67,6 +67,20 @@ def labels(service):
     return dict(item.split("=", 1) for item in service["labels"])
 
 
+def test_configure_bastion_backs_up_dangling_crowdsec_symlinks(tmp_path):
+    install = make_install(tmp_path)
+    scenarios = install / "crowdsec" / "scenarios"
+    scenarios.mkdir()
+    # The CrowdSec hub links scenario files into the container image, so the
+    # link target does not exist on the bastion host.
+    (scenarios / "ssh-bf.yaml").symlink_to("/etc/crowdsec/hub/scenarios/crowdsecurity/ssh-bf.yaml")
+
+    CONFIGURE.configure(install)
+
+    backup = sorted((install / "backups").iterdir())[-1]
+    assert (backup / "crowdsec" / "scenarios" / "ssh-bf.yaml").is_symlink()
+
+
 def test_configure_bastion_is_idempotent_and_keeps_separate_keys(tmp_path):
     install = make_install(tmp_path)
     CONFIGURE.configure(install)
