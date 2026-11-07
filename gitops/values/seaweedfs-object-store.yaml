@@ -61,6 +61,12 @@ admin:
   replicas: 1
   nodeSelector: |
     twinbox.io/role: worker
+  # `weed admin` 4.46+ refuses to bind a non-loopback address without auth, but
+  # the kubelet probes dial the pod IP so a loopback bind never becomes ready.
+  # Access to the console is already gated by the Authentik forward-auth
+  # IngressRoute (s3-admin.<zone>), so keep that as the single gate instead of
+  # adding a second local password.
+  allowInsecureBind: true
   data:
     type: emptyDir
   logs:

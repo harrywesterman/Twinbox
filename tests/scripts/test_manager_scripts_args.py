@@ -1140,6 +1140,9 @@ def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
     assert "master:" in values_text and "enabled: true" in values_text
     assert "volume:" in values_text and "filer:" in values_text and "s3:" in values_text
     assert "admin:" in values_text
+    # weed admin 4.46+ needs this opt-out to bind a non-loopback address without
+    # local auth; the s3-admin console is gated by Authentik forward-auth.
+    assert "allowInsecureBind: true" in values_text
     assert "storageClass: longhorn" in values_text
     assert "twinbox.io/role: worker" in values_text
     assert "allInOne:" in values_text and "enabled: false" in values_text
