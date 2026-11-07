@@ -400,6 +400,48 @@ const QUESTION_STEP_DEFS = [
     ],
   },
   {
+    id: "configure-ai-endpoint",
+    title: "Configure AI Endpoint",
+    type: "config",
+    journey_stage: "setup",
+    summary: "Store the OpenAI-compatible endpoint used by the AI beheerteam.",
+    explanation:
+      "Twinbox does not host a language model. Point it at an OpenAI-compatible endpoint such as Ollama, omlx, vLLM, LM Studio or a hosted API. You can also leave this empty and configure it later in the Portal.",
+    side_help:
+      "The AI beheerteam and AI-enabled apps share this endpoint. The API key is stored only as a cluster secret.",
+    inputs: [
+      {
+        id: "ai_base_url",
+        label: "OpenAI-compatible Base URL",
+        type: "string",
+        required: false,
+        help: "Absolute HTTP(S) URL of the OpenAI-compatible API, without a trailing slash.",
+      },
+      {
+        id: "ai_model",
+        label: "Model",
+        type: "string",
+        required: false,
+        help: "Model identifier accepted by the configured endpoint.",
+      },
+      {
+        id: "ai_display_name",
+        label: "Display name (optional)",
+        type: "string",
+        required: false,
+        help: "Friendly name shown for this endpoint in the Portal.",
+      },
+      {
+        id: "ai_api_key",
+        label: "API key (optional)",
+        type: "password",
+        required: false,
+        sensitive: true,
+        help: "Leave empty when the endpoint does not require authentication. Stored only as a cluster secret.",
+      },
+    ],
+  },
+  {
     id: "provision-netbird-bastion",
     title: "Deploy NetBird Bastion Host",
     type: "action",

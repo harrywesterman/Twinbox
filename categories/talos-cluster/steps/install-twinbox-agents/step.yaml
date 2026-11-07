@@ -4,30 +4,8 @@ type: action
 journey_stage: setup
 summary: Install the Twinbox AI beheerteam service and configure its OpenAI-compatible endpoint.
 explanation: Twinbox deploys the read-only AI beheerteam service through Argo CD, stores its internal service token in OpenBao, and configures the shared OpenAI-compatible endpoint for the agents and AI-enabled applications.
-side_help: Use the endpoint and model exposed by your local or hosted OpenAI-compatible service. The API key is stored only in the cluster secret store and can be changed later from the Portal.
-inputs:
-  - id: ai_base_url
-    label: OpenAI-compatible Base URL
-    type: string
-    required: true
-    help: Absolute HTTP(S) URL of the OpenAI-compatible API, without a trailing slash.
-  - id: ai_model
-    label: Model
-    type: string
-    required: true
-    help: Model identifier accepted by the configured endpoint.
-  - id: ai_display_name
-    label: Display name (optional)
-    type: string
-    required: false
-    help: Friendly name shown for this endpoint in the Portal.
-  - id: ai_api_key
-    label: API key (optional)
-    type: password
-    required: false
-    sensitive: true
-    secret_field: api_key
-    help: Leave empty when the endpoint does not require authentication. Stored only as a cluster secret.
+side_help: Use the endpoint and model configured in the AI endpoint step, or set them later in the Portal. The API key is stored only in the cluster secret store.
+inputs: []
 secrets:
   files:
     KUBECONFIG_FILE:

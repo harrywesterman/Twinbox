@@ -1106,6 +1106,24 @@ def test_user_apps_are_not_part_of_bootstrap_journey():
     )
 
 
+def test_ai_endpoint_is_asked_before_the_agents_step():
+    journey_text = MANAGER_WEB_JOURNEY.read_text(encoding="utf-8")
+    question_text = (REPO_ROOT / "manager-web" / "src" / "question-flow.js").read_text(
+        encoding="utf-8"
+    )
+    setup_step_ids = journey_text.split("const FIXED_SETUP_STEP_IDS = [", 1)[1].split(
+        "];",
+        1,
+    )[0]
+
+    assert setup_step_ids.index('"configure-ai-endpoint"') < setup_step_ids.index(
+        '"install-twinbox-agents"'
+    )
+    assert 'id: "configure-ai-endpoint"' in question_text
+    for field in ("ai_base_url", "ai_model", "ai_display_name", "ai_api_key"):
+        assert f'id: "{field}"' in question_text
+
+
 def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
     journey_text = MANAGER_WEB_JOURNEY.read_text(encoding="utf-8")
     setup_step_ids = journey_text.split("const FIXED_SETUP_STEP_IDS = [", 1)[1].split(
@@ -6522,4 +6540,13 @@ def test_beszel_install_configures_pocketbase_oauth_options():
     assert ".oauth2 = $oauth.oauth2" in beszel_text
     assert "allowOAuth2" not in beszel_text
     assert "enabledOAuth2Providers" not in beszel_text
-    assert "userInfoUrl: $userinfo_url" in beszel_text
+    # PocketBase expects authURL/tokenURL/userInfoURL (capital URL); the
+    # lowercase variants are silently ignored, which leaves the provider
+    # unusable and the login button broken.
+    assert "authURL: $auth_url" in beszel_text
+    assert "tokenURL: $token_url" in beszel_text
+    assert "userInfoURL: $userinfo_url" in beszel_text
+    assert 'scopes: "openid profile email"' in beszel_text
+    assert "authUrl:" not in beszel_text
+    assert "tokenUrl:" not in beszel_text
+    assert "userInfoUrl:" not in beszel_text

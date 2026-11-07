@@ -42,6 +42,7 @@ const FIXED_SETUP_STEP_IDS = [
   "install-beszel",
   "install-dashy-dashboard",
   "install-twinbox-portal",
+  "configure-ai-endpoint",
   "install-twinbox-agents",
   "install-management-consoles",
   "install-pgadmin4",

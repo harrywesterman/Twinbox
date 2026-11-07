@@ -96,9 +96,14 @@ spec:
             - -ec
             - |
               cd /pgadmin4
-              python_bin=/tmp/python3.14.no-cap
-              cp /usr/local/bin/python3.14 "${python_bin}"
+              # Derive the interpreter version from the image instead of pinning
+              # it: pgAdmin image bumps move Python (3.14 -> 3.15) and a pinned
+              # path makes the container crash with "cp: can't stat".
+              py_ver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+              python_bin="/tmp/python${py_ver}.no-cap"
+              cp "$(command -v python3)" "${python_bin}"
               chmod 0755 "${python_bin}"
+              export PYTHONPATH="/venv/lib/python${py_ver}/site-packages:/venv/lib/python${py_ver}/dist-packages:/usr/local/lib/python${py_ver}/site-packages"
               cat > /tmp/patch-sharedserver-passexec.py <<'PY'
               from pathlib import Path
               import sys
@@ -202,10 +207,12 @@ spec:
                   - /bin/sh
                   - -ec
                   - |
-                    python_bin=/tmp/python3.14.no-cap
-                    cp /usr/local/bin/python3.14 "${python_bin}"
+                    py_ver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+                    python_bin="/tmp/python${py_ver}.no-cap"
+                    cp "$(command -v python3)" "${python_bin}"
                     chmod 0755 "${python_bin}"
-                    export PYTHONPATH=/venv/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages
+                    export PYTHONPATH="/venv/lib/python${py_ver}/site-packages:/usr/local/lib/python${py_ver}/site-packages"
+                    export TWINBOX_PYTHON_BIN="${python_bin}"
                     cat > /tmp/load-shared-servers.py <<'PY'
                     import os
                     import sqlite3
@@ -242,7 +249,7 @@ spec:
 
                     subprocess.run(
                         [
-                            "/tmp/python3.14.no-cap",
+                            os.environ["TWINBOX_PYTHON_BIN"],
                             "/pgadmin4/setup.py",
                             "load-servers",
                             "/config/pgadmin4-servers.json",
@@ -315,16 +322,16 @@ spec:
           env:
             - name: PGADMIN_DISABLE_POSTFIX
               value: "1"
-            - name: PYTHONPATH
-              value: /venv/lib/python3.14/site-packages:/venv/lib/python3.14/dist-packages
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -ec
                 - |
-                  test -x /tmp/python3.14.no-cap
-                  exec /tmp/python3.14.no-cap - <<'PY'
+                  py_ver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+                  python_bin="/tmp/python${py_ver}.no-cap"
+                  test -x "${python_bin}"
+                  exec "${python_bin}" - <<'PY'
                   import os
                   import sqlite3
                   import sys

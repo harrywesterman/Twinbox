@@ -11,6 +11,12 @@ AGENTS_INSTALL_STEP_MANIFEST = (
 AGENTS_INSTALL_STEP_RUN = (
     REPO_ROOT / "categories" / "talos-cluster" / "steps" / "install-twinbox-agents" / "run.sh"
 )
+AI_ENDPOINT_STEP_MANIFEST = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-ai-endpoint" / "step.yaml"
+)
+AI_ENDPOINT_STEP_RUN = (
+    REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-ai-endpoint" / "run.sh"
+)
 SHARED_AI_BASELINE_SCRIPT = REPO_ROOT / "scripts" / "manager" / "ensure-shared-ai-secret.sh"
 KUBERNETES_AI_REFRESH_SCRIPT = REPO_ROOT / "scripts" / "manager" / "kubernetes-ai-refresh.sh"
 
@@ -230,15 +236,9 @@ def test_twinbox_agents_has_web_wizard_install_step():
     assert step["title"] == "Install AI Beheerteam"
     assert step["type"] == "action"
     assert step["journey_stage"] == "setup"
-    assert {input_["id"] for input_ in step["inputs"]} == {
-        "ai_base_url",
-        "ai_model",
-        "ai_display_name",
-        "ai_api_key",
-    }
-    api_key = next(input_ for input_ in step["inputs"] if input_["id"] == "ai_api_key")
-    assert api_key["sensitive"] is True
-    assert api_key["secret_field"] == "api_key"
+    # The endpoint variables live in the dedicated configure-ai-endpoint step so
+    # Install all does not stop here on empty required inputs.
+    assert step["inputs"] == []
     assert (
         step["runner"]["script"] == "categories/talos-cluster/steps/install-twinbox-agents/run.sh"
     )
@@ -265,6 +265,58 @@ def test_twinbox_agents_install_step_applies_argocd_app_and_secret_plumbing():
     assert "STEP_INPUTS_JSON:?missing STEP_INPUTS_JSON" in script_text
     assert "MANAGER_DATA_DIR:?missing MANAGER_DATA_DIR" in script_text
     assert "sync-twinbox-agents-config.sh" in script_text
+
+
+def test_configure_ai_endpoint_step_owns_the_ai_variables():
+    step = yaml.safe_load(AI_ENDPOINT_STEP_MANIFEST.read_text(encoding="utf-8"))
+
+    assert step["id"] == "configure-ai-endpoint"
+    assert step["type"] == "config"
+    assert step["journey_stage"] == "setup"
+    assert {input_["id"] for input_ in step["inputs"]} == {
+        "ai_base_url",
+        "ai_model",
+        "ai_display_name",
+        "ai_api_key",
+    }
+    # Optional: an empty endpoint must never block Install all.
+    assert all(input_.get("required") is False for input_ in step["inputs"])
+    api_key = next(input_ for input_ in step["inputs"] if input_["id"] == "ai_api_key")
+    assert api_key["sensitive"] is True
+    assert api_key["secret_field"] == "api_key"
+    assert step["runner"]["script"] == "categories/talos-cluster/steps/configure-ai-endpoint/run.sh"
+
+
+def test_configure_ai_endpoint_runner_stores_endpoint_and_allows_empty(tmp_path):
+    def run(inputs):
+        env = os.environ.copy()
+        env["STEP_CONTEXT_JSON"] = '{"cluster":{"id":"prd"}}'
+        env["STEP_INPUTS_JSON"] = inputs
+        env["TWINBOX_BOOTSTRAP_DIR"] = str(tmp_path)
+        return subprocess.run(
+            ["bash", str(AI_ENDPOINT_STEP_RUN)],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+    configured = run(
+        '{"ai_base_url":"http://192.168.2.252:11434/v1/","ai_model":"qwen2.5:7b",'
+        '"ai_display_name":"Homelab"}'
+    )
+    assert configured.returncode == 0, configured.stderr
+    config = (tmp_path / "secrets" / "cluster" / "prd" / "ai-endpoint" / "config.json").read_text()
+    assert '"baseUrl": "http://192.168.2.252:11434/v1"' in config
+    assert '"model": "qwen2.5:7b"' in config
+    assert '"displayName": "Homelab"' in config
+
+    empty = run("{}")
+    assert empty.returncode == 0, empty.stderr
+    assert "No AI endpoint configured" in empty.stdout
+
+    incomplete = run('{"ai_base_url":"http://192.168.2.252:11434/v1"}')
+    assert incomplete.returncode != 0
+    assert "AI model is required" in incomplete.stderr
 
 
 def test_ai_consuming_app_install_steps_resync_shared_endpoint_when_configured():

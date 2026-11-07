@@ -64,16 +64,27 @@ jq \
 mv "$next_secret_json" "$AGENTS_SECRET_FILE"
 chmod 600 "$AGENTS_SECRET_FILE"
 
-base_url="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_base_url')"
-model="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_model')"
-display_name="$(printf '%s' "$STEP_INPUTS_JSON" | jq -r '.ai_display_name // ""')"
-jq -n \
-  --arg display_name "$display_name" \
-  --arg base_url "$base_url" \
-  --arg model "$model" \
-  '{displayName: $display_name, baseUrl: ($base_url | rtrimstr("/")), model: $model, timeoutMs: 60000}' \
-  >"$PROVIDER_FILE"
-chmod 600 "$PROVIDER_FILE"
+ai_config_file="${TWINBOX_BOOTSTRAP_DIR}/secrets/cluster/${cluster_id}/ai-endpoint/config.json"
+base_url=""
+model=""
+display_name=""
+if [[ -s "$ai_config_file" ]]; then
+  base_url="$(jq -r '.baseUrl // empty' "$ai_config_file")"
+  model="$(jq -r '.model // empty' "$ai_config_file")"
+  display_name="$(jq -r '.displayName // empty' "$ai_config_file")"
+fi
+if [[ -n "$base_url" && -n "$model" ]]; then
+  jq -n \
+    --arg display_name "$display_name" \
+    --arg base_url "$base_url" \
+    --arg model "$model" \
+    '{displayName: $display_name, baseUrl: ($base_url | rtrimstr("/")), model: $model, timeoutMs: 60000}' \
+    >"$PROVIDER_FILE"
+  chmod 600 "$PROVIDER_FILE"
+  log "Using configured AI endpoint ${base_url} (model ${model})"
+else
+  log "No AI endpoint configured; installing the AI beheerteam without one (configure it later in the Portal)"
+fi
 
 log "Syncing Twinbox agents runtime secret to OpenBao"
 bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \

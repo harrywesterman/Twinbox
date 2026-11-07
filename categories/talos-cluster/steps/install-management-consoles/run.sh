@@ -603,7 +603,7 @@ upsert_env_value() {
   chmod 0600 "$env_file" || true
 
   tmp_file="$(mktemp)"
-  awk -v key="$key" -v value="$value" '
+  if ! awk -v key="$key" -v value="$value" '
     BEGIN { written = 0 }
     $0 ~ "^[[:space:]]*#" { print; next }
     index($0, key "=") == 1 {
@@ -615,9 +615,12 @@ upsert_env_value() {
     END {
       if (!written) {
         print key "=" value
-      },
+      }
     }
-  ' "$env_file" >"$tmp_file"
+  ' "$env_file" >"$tmp_file"; then
+    rm -f "$tmp_file"
+    return 1
+  fi
   mv "$tmp_file" "$env_file"
   chmod 0600 "$env_file" || true
 }

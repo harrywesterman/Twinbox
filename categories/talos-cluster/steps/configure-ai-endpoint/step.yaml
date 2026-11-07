@@ -1,0 +1,40 @@
+id: configure-ai-endpoint
+title: Configure AI endpoint
+type: config
+journey_stage: setup
+summary: Store the OpenAI-compatible endpoint used by the Twinbox AI beheerteam and AI-enabled apps.
+explanation: >
+  Twinbox does not host a language model. Point it at an OpenAI-compatible
+  endpoint (Ollama, omlx, vLLM, LM Studio or a hosted API); the AI beheerteam
+  and AI-enabled apps use it. The values are stored cluster-scoped and can be
+  changed later in the Portal at /admin/agents.
+side_help: >
+  Leave both fields empty when you do not have an endpoint yet. The AI
+  beheerteam is still installed and can be pointed at an endpoint later from
+  the Portal.
+inputs:
+  - id: ai_base_url
+    label: OpenAI-compatible Base URL
+    type: string
+    required: false
+    help: Absolute HTTP(S) URL of the OpenAI-compatible API, without a trailing slash.
+  - id: ai_model
+    label: Model
+    type: string
+    required: false
+    help: Model identifier accepted by the configured endpoint.
+  - id: ai_display_name
+    label: Display name (optional)
+    type: string
+    required: false
+    help: Friendly name shown for this endpoint in the Portal.
+  - id: ai_api_key
+    label: API key (optional)
+    type: password
+    required: false
+    sensitive: true
+    secret_field: api_key
+    help: Leave empty when the endpoint does not require authentication. Stored only as a cluster secret.
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-ai-endpoint/run.sh

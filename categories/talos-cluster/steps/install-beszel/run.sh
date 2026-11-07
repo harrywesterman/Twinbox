@@ -570,9 +570,10 @@ if [[ -n "$existing_collection" ]]; then
             displayName: "Authentik",
             clientId: $client_id,
             clientSecret: $client_secret,
-            authUrl: $auth_url,
-            tokenUrl: $token_url,
-            userInfoUrl: $userinfo_url
+            authURL: $auth_url,
+            tokenURL: $token_url,
+            userInfoURL: $userinfo_url,
+            scopes: "openid profile email"
           }]
         }
       }'
