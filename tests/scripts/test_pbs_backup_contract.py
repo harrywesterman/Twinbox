@@ -67,6 +67,21 @@ def test_pbs_step_and_runner_contract():
     assert "pbs_admin_password" not in cloud_init
 
 
+def test_pbs_storage_update_omits_fixed_parameters():
+    runner = (ROOT / "scripts/manager/install-proxmox-backup-server.sh").read_text()
+
+    # Proxmox rejects a PUT /storage/<id> that carries create-only parameters
+    # ("can't change value of fixed parameter 'server'", and datastore is not in
+    # the update schema), which silently left a stale fingerprint behind.
+    update_line = next(
+        line for line in runner.splitlines() if 'pve_put "/storage/${storage_id}"' in line
+    )
+    assert "server=" not in update_line
+    assert "datastore=" not in update_line
+    assert "fingerprint=${pbs_fingerprint}" in update_line
+    assert """jq -e 'has("message") | not'""" in runner
+
+
 def test_pbs_vm_has_required_resources_and_no_fixed_network_defaults():
     module = (ROOT / "infra/opentofu/pbs-backup/main.tf").read_text()
     variables = (ROOT / "infra/opentofu/pbs-backup/variables.tf").read_text()

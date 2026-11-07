@@ -250,9 +250,14 @@ pbs_fingerprint="$($remote "sudo proxmox-backup-manager cert info | sed -n 's/^F
 
 storage_id="twinbox-pbs-${cluster_slug}"; storage_list="$(pve_get '/storage')"
 if ! jq -e --arg id "$storage_id" '.data|any(.storage==$id)' <<<"$storage_list" >/dev/null; then
-  pve_post '/storage' --data-urlencode "storage=${storage_id}" --data-urlencode 'type=pbs' --data-urlencode "server=${ip_address}" --data-urlencode 'datastore=twinbox-s3' --data-urlencode 'username=pve@pbs!twinbox' --data-urlencode "password=${token_value}" --data-urlencode "fingerprint=${pbs_fingerprint}" --data-urlencode 'content=backup' >/dev/null
+  storage_result="$(pve_post '/storage' --data-urlencode "storage=${storage_id}" --data-urlencode 'type=pbs' --data-urlencode "server=${ip_address}" --data-urlencode 'datastore=twinbox-s3' --data-urlencode 'username=pve@pbs!twinbox' --data-urlencode "password=${token_value}" --data-urlencode "fingerprint=${pbs_fingerprint}" --data-urlencode 'content=backup')"
+  jq -e 'has("message") | not' <<<"$storage_result" >/dev/null || fail "Could not create PBS storage ${storage_id}: ${storage_result}"
 else
-  pve_put "/storage/${storage_id}" --data-urlencode "server=${ip_address}" --data-urlencode 'datastore=twinbox-s3' --data-urlencode 'username=pve@pbs!twinbox' --data-urlencode "password=${token_value}" --data-urlencode "fingerprint=${pbs_fingerprint}" --data-urlencode 'content=backup' >/dev/null
+  # `server` and `datastore` are fixed parameters on update; Proxmox rejects a
+  # PUT that includes them ("can't change value of fixed parameter 'server'"
+  # / "property is not defined in schema"). Only mutable fields may be sent.
+  storage_result="$(pve_put "/storage/${storage_id}" --data-urlencode 'username=pve@pbs!twinbox' --data-urlencode "password=${token_value}" --data-urlencode "fingerprint=${pbs_fingerprint}" --data-urlencode 'content=backup')"
+  jq -e 'has("message") | not' <<<"$storage_result" >/dev/null || fail "Could not update PBS storage ${storage_id}: ${storage_result}"
 fi
 resources="$(pve_get '/cluster/resources?type=vm')"
 exclude_vmids="${vm_id}"
