@@ -318,6 +318,7 @@ NETBIRD_PROXY_SERVICES_MODULE_VARS = (
 )
 NETBIRD_MODULE_VARS = REPO_ROOT / "infra" / "opentofu" / "netbird" / "variables.tf"
 NETBIRD_MODULE_MAIN = REPO_ROOT / "infra" / "opentofu" / "netbird" / "main.tf"
+NETBIRD_MODULE_LOCALS = REPO_ROOT / "infra" / "opentofu" / "netbird" / "locals.tf"
 NETBIRD_CLOUD_INIT = (
     REPO_ROOT / "infra" / "opentofu" / "netbird" / "cloud-init" / "netbird.yaml.tftpl"
 )
@@ -6293,6 +6294,24 @@ def test_uninstall_authentik_cleanup_sets_forward_before_app_cleanup():
     assert setup_forward_index < cleanup_index
     assert 'kubectl delete -k "$database_app_dir"' in text
     assert 'kubectl delete -f "$database_app_dir"' in text
+
+
+def test_netbird_bastion_tofu_workdir_ships_crowdsec_helper():
+    run_text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
+    locals_text = NETBIRD_MODULE_LOCALS.read_text(encoding="utf-8")
+
+    # The step copies the module into a scratch workdir and runs tofu from
+    # there, so ${path.module} is that workdir, not the repo. Every file() the
+    # module reads must either be copied in or fall back to the repo path.
+    assert (
+        'cp "$WORKSPACE_ROOT/scripts/manager/configure-netbird-crowdsec.py" "$tf_workdir/"'
+        in run_text
+    )
+    assert 'fileexists("${path.module}/configure-netbird-crowdsec.py")' in locals_text
+    assert (
+        'fileexists("${path.module}/cloud-init/netbird-bastion-bootstrap-template.sh")'
+        in locals_text
+    )
 
 
 def test_netbird_bastion_provisioning_fetches_dns_credentials():

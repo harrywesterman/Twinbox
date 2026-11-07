@@ -715,6 +715,7 @@ mkdir -p "$tf_workdir"
 cp -r "$WORKSPACE_ROOT/infra/opentofu/netbird/"* "$tf_workdir/"
 cp "$WORKSPACE_ROOT/scripts/manager/netbird-bastion-bootstrap-template.sh" \
   "$tf_workdir/cloud-init/netbird-bastion-bootstrap-template.sh"
+cp "$WORKSPACE_ROOT/scripts/manager/configure-netbird-crowdsec.py" "$tf_workdir/"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initializing OpenTofu for NetBird VPS"
 cd "$tf_workdir"
