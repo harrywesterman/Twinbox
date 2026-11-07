@@ -266,18 +266,18 @@ mv -f "$TWINBOX_MARKER.tmp" "$TWINBOX_MARKER"
 chmod 0644 "$TWINBOX_MARKER"
 
 if [[ ! -f getting-started.sh ]]; then
-  curl -fsSL https://github.com/netbirdio/netbird/releases/latest/download/getting-started.sh -o getting-started.sh
+  curl -fsSL "https://github.com/netbirdio/netbird/releases/download/v${NETBIRD_VERSION}/getting-started.sh" -o getting-started.sh
   chmod 0755 getting-started.sh
 fi
 
 if [[ ! -f docker-compose.yml ]]; then
   python3 <<'PY'
 import os
+import re
 from pathlib import Path
 
 path = Path("/opt/netbird/getting-started.sh")
 script = path.read_text()
-marker = "\ninit_environment\n"
 overrides = (
     "\n"
     "# Twinbox non-interactive defaults.\n"
@@ -312,8 +312,11 @@ overrides = (
     "  return 0\n"
     "}\n"
 )
-if marker in script and "Twinbox non-interactive defaults" not in script:
-    script = script.replace(marker, overrides + marker, 1)
+call = re.search(r"(?m)^[ \t]*init_environment[ \t]*$", script)
+if call is None:
+    raise SystemExit("ERROR: Could not find NetBird init_environment call.")
+if "Twinbox non-interactive defaults" not in script:
+    script = script[: call.start()] + overrides + script[call.start():]
 proxy_start = "$DOCKER_COMPOSE_COMMAND up -d proxy"
 proxy_retry = 'retry_netbird_step "Start NetBird reverse proxy" $DOCKER_COMPOSE_COMMAND up -d proxy'
 if proxy_retry not in script:
@@ -328,8 +331,6 @@ if proxy_retry not in script:
     if not replaced:
         raise SystemExit("ERROR: Could not patch NetBird reverse proxy startup for retries.")
     script = "\n".join(lines) + "\n"
-if marker not in script:
-    raise SystemExit("ERROR: Could not find NetBird init_environment marker.")
 path.write_text(script)
 PY
   ./getting-started.sh

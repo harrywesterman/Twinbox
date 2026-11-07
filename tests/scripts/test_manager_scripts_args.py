@@ -6331,6 +6331,19 @@ def test_netbird_bastion_tofu_workdir_ships_crowdsec_helper():
     )
 
 
+def test_netbird_bastion_bootstrap_pins_getting_started_script():
+    text = NETBIRD_BASTION_BOOTSTRAP_TEMPLATE.read_text(encoding="utf-8")
+
+    # Download the release that matches the pinned NetBird version instead of
+    # whatever "latest" is today.
+    assert "releases/download/v${NETBIRD_VERSION}/getting-started.sh" in text
+    assert "releases/latest/download/getting-started.sh" not in text
+    # Upstream moved the init_environment call inside a guard/function, so match
+    # the call site by indentation instead of the old exact "\ninit_environment\n".
+    assert 're.search(r"(?m)^[ \\t]*init_environment[ \\t]*$", script)' in text
+    assert "Could not find NetBird init_environment call." in text
+
+
 def test_netbird_bastion_provisioning_fetches_dns_credentials():
     text = NETBIRD_BASTION_STEP_SCRIPT.read_text(encoding="utf-8")
     dns_step_text = (
