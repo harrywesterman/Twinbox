@@ -122,9 +122,9 @@ Fix:
 
 - Check the Cilium/Kubernetes compatibility matrix before chasing lower-level datapath bugs; `1.18.x` is not a safe fit for Kubernetes `v1.35.x`
 - Check whether the rendered Cilium manifest was built with the cluster VIP/API endpoint rather than `localhost:7445`
-- Verify the Talos machine config includes `cluster.network.cni.name: none` and `cluster.proxy.disabled: true`
-- Verify `machine.features.kubePrism.enabled: true` and `machine.features.kubePrism.port: 7445`
-- Verify `machine.features.hostDNS.forwardKubeDNSToHost: false`
+- Verify the Talos machine config deletes the `KubeFlannelCNIConfig` document and sets `KubeProxyConfig.enabled: false`
+- Verify `KubePrismConfig.port: 7445`
+- Verify `ResolverConfig.hostDNS.forwardKubeDNSToHost: false`
 - Inspect the rendered manifest under `/opt/twinbox/bootstrap/secrets/cluster/<cluster-id>/cilium/cilium-bootstrap.yaml`
 - Check `kubectl -n kube-system logs daemonset/cilium` and `kubectl -n kube-system logs deployment/cilium-operator`
 - If Cilium still crashes after the endpoint is corrected, compare the pinned chart version against the next supported Cilium release before considering a cluster rebuild

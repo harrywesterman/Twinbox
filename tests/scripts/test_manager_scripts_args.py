@@ -816,15 +816,23 @@ def test_cilium_bootstrap_renders_inline_manifest_and_talos_patches():
     assert "render_cilium_manifest()" in text
     assert 'render_cilium_manifest "$cilium_manifest_file"' in text
     assert 'upsert_secret_artifact "cilium" "cilium-bootstrap.yaml"' in text
-    assert "kubePrism:" in text
+    # Talos v1.14 moved these settings into config documents; the legacy
+    # v1alpha1 keys are rejected when both representations are present.
+    assert "kind: KubePrismConfig" in text
     assert "port: 7445" in text
     assert "forwardKubeDNSToHost: false" in text
-    assert "cni:" in text
-    assert "name: none" in text
-    assert "proxy:" in text
-    assert "disabled: true" in text
-    assert "inlineManifests:" in text
-    assert "sed 's/^/        /' \"$cilium_manifest_file\"" in text
+    assert "kind: KubeFlannelCNIConfig" in text
+    assert 'echo "\\$patch: delete"' in text
+    assert "kind: KubeProxyConfig" in text
+    assert 'echo "enabled: false"' in text
+    assert "kind: KubeInlineManifestConfig" in text
+    assert 'echo "name: cilium"' in text
+    assert "sed 's/^/    /' \"$cilium_manifest_file\"" in text
+    assert "nodeLabels:" not in text
+    assert "kubePrism:" not in text
+    assert "inlineManifests:" not in text
+    assert 'echo "    cni:"' not in text
+    assert 'echo "  proxy:"' not in text
     assert 'wait_for_kubernetes_rollout "daemonset/cilium" "kube-system" "Cilium DaemonSet"' in text
     assert (
         'wait_for_kubernetes_rollout "deployment/cilium-operator" "kube-system" "Cilium operator"'
@@ -907,19 +915,19 @@ def test_talos_worker_max_pods_scales_with_vcpu_and_allows_override():
     assert "if (( node_max_pods < 110 )); then" in script_text
     assert "TWINBOX_MAX_PODS must be a non-negative integer" in script_text
     # maxPods must be emitted as a KubeletConfiguration override; a bare
-    # kubelet.maxPods key is rejected by Talos config parsing.
-    assert 'echo "  kubelet:"' in script_text
-    assert 'echo "    extraConfig:"' in script_text
-    assert 'echo "      maxPods: ${node_max_pods}"' in script_text
+    # maxPods key is rejected by Talos config parsing.
+    assert 'echo "kind: KubeletConfig"' in script_text
+    assert 'echo "config:"' in script_text
+    assert 'echo "  maxPods: ${node_max_pods}"' in script_text
     assert 'echo "    maxPods: ${node_max_pods}"' not in script_text
 
 
-def test_write_node_patch_emits_valid_extraconfig_maxpods():
+def test_write_node_patch_emits_talos_1_14_config_documents():
     """Executes the real write_node_patch from apply-cluster.sh and validates YAML.
 
-    Regression guard: a bare ``machine.kubelet.maxPods`` key is rejected by Talos
-    config parsing (``talosctl gen config`` fails with ``unknown keys``), so the
-    patch must emit ``machine.kubelet.extraConfig.maxPods`` instead.
+    Regression guard: Talos v1.14 rejects settings on the legacy v1alpha1 config
+    when the generated config documents are present (``... is already set in
+    v1alpha1 config``), so node settings must be emitted as config documents.
     """
     script_text = _apply_cluster_text()
 
@@ -932,14 +940,19 @@ def test_write_node_patch_emits_valid_extraconfig_maxpods():
 
     harness_prefix = (
         'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
-        'DNS_SERVERS=""\n'
+        'NAME="twinbox-prd"\n'
+        'DNS_SERVERS="1.1.1.1,8.8.8.8"\n'
         'DNS_DOMAIN=""\n'
         'TWINBOX_TIME_SERVER="time.cloudflare.com"\n'
+        'GATEWAY_IP="192.168.2.1"\n'
+        'VIP_IP="192.168.2.50"\n'
+        'NODE_PREFIX_LENGTH="24"\n'
     )
 
-    def run(cores, override=None):
+    def run(cores, override=None, node_type="worker"):
         script = (
-            f"{harness_prefix}{func}\nwrite_node_patch w1 worker 10.0.0.1 aa /tmp/wp.yaml {cores}\n"
+            f"{harness_prefix}{func}\n"
+            f"write_node_patch n1 {node_type} 10.0.0.1 aa /tmp/wp.yaml {cores}\n"
         )
         env = os.environ.copy()
         if override:
@@ -951,19 +964,50 @@ def test_write_node_patch_emits_valid_extraconfig_maxpods():
             text=True,
         )
         assert proc.returncode == 0, f"stderr: {proc.stderr}\nstdout: {proc.stdout}"
-        return yaml.safe_load(open("/tmp/wp.yaml").read())
+        return [doc for doc in yaml.safe_load_all(open("/tmp/wp.yaml").read()) if doc]
 
-    patch = run(10)
-    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 150
+    def by_kind(documents, kind):
+        matches = [doc for doc in documents if doc.get("kind") == kind]
+        assert len(matches) == 1, f"expected exactly one {kind} document, got {len(matches)}"
+        return matches[0]
 
-    patch = run(2)
-    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 110
+    def max_pods(documents):
+        return by_kind(documents, "KubeletConfig")["config"]["maxPods"]
 
-    patch = run(16)
-    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 240
+    assert max_pods(run(10)) == 150
+    assert max_pods(run(2)) == 110
+    assert max_pods(run(16)) == 240
+    assert max_pods(run(10, override="200")) == 200
 
-    patch = run(10, override="200")
-    assert patch["machine"]["kubelet"]["extraConfig"]["maxPods"] == 200
+    worker = run(2)
+    worker_kinds = {doc.get("kind") for doc in worker}
+    assert "KubeProxyConfig" not in worker_kinds
+    assert by_kind(worker, "KubeFlannelCNIConfig")["$patch"] == "delete"
+    assert by_kind(worker, "KubeNodeConfig")["labels"] == {
+        "twinbox.io/role": "worker",
+        "node.longhorn.io/create-default-disk": "true",
+    }
+    assert by_kind(worker, "ResolverConfig")["nameservers"] == [
+        {"address": "1.1.1.1"},
+        {"address": "8.8.8.8"},
+    ]
+    assert by_kind(worker, "KubePrismConfig")["port"] == 7445
+
+    # The legacy v1alpha1 document may only carry settings that Talos has not
+    # migrated to config documents.
+    classic = next(doc for doc in worker if "machine" in doc)
+    assert "kubelet" not in classic["machine"]
+    assert "nodeLabels" not in classic["machine"]
+    assert "features" not in classic["machine"]
+    assert "cluster" not in classic
+
+    controlplane = run(2, node_type="controlplane")
+    assert by_kind(controlplane, "KubeProxyConfig")["enabled"] is False
+    assert by_kind(controlplane, "KubeAPIServerConfig")["resources"]["requests"] == {
+        "cpu": "500m",
+        "memory": "1Gi",
+    }
+    assert by_kind(controlplane, "KubeNodeConfig")["labels"] == {"twinbox.io/role": "control-plane"}
 
 
 def test_longhorn_step_installs_via_argocd_and_waits_for_health():
@@ -1563,7 +1607,7 @@ def test_apply_cluster_renders_static_nocloud_talos_flow_and_tracks_iac_paths():
     assert 'talosctl config node "$default_node_ip"' in text
     assert 'talosctl config endpoint "$default_node_ip"' in text
     assert "Reusing existing OpenTofu workspace at ${work_module_dir}" in text
-    assert 'echo "    image: ${image_installer}"' in text
+    assert '--install-image "$image_installer"' in text
     assert 'image_installer="${line#TALOS_IMAGE_INSTALLER=}"' in text
     assert "image_extensions=" not in text
     assert "TALOS_IMAGE_EXTENSIONS=" not in text

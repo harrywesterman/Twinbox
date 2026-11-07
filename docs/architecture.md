@@ -314,10 +314,10 @@ The Talos cluster is provisioned in a strict sequence:
 
 3. **Cilium Injection** — `render-cilium-manifest.sh` renders the pinned Cilium Helm chart.
    - Manifest stored at `/opt/twinbox/bootstrap/secrets/cluster/<id>/cilium/cilium-bootstrap.yaml`
-   - Injected as inline manifest into control-plane Talos configs
-   - Configured for kube-proxy-free: `cni: none`, `proxy.disabled: true`
-   - KubePrism enabled on port `7445`
-   - Host DNS workaround: `hostDNS.forwardKubeDNSToHost: false`
+   - Manifest injected as a `KubeInlineManifestConfig` document into control-plane Talos configs
+   - Configured for kube-proxy-free: `KubeFlannelCNIConfig` deleted, `KubeProxyConfig.enabled: false`
+   - KubePrism enabled on port `7445` via `KubePrismConfig`
+   - Host DNS workaround: `ResolverConfig.hostDNS.forwardKubeDNSToHost: false`
    - Explicit NTP: `machine.time.servers: [TWINBOX_TIME_SERVER]`
    - Hubble Relay and Hubble UI enabled
 

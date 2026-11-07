@@ -1425,10 +1425,12 @@ write_node_patch() {
   local mac="$4"
   local patch_file="$5"
   local cpu_cores="${6:-0}"
-  local nameserver_block=""
-  local search_domain_block=""
   local time_server="${TWINBOX_TIME_SERVER:-time.cloudflare.com}"
   local role_label="$type"
+  local nameservers=()
+  local search_domains=()
+  local server=""
+  local domain=""
 
   if [[ "$type" == "controlplane" ]]; then
     role_label="control-plane"
@@ -1436,55 +1438,29 @@ write_node_patch() {
 
   if [[ -n "${DNS_SERVERS:-}" ]]; then
     IFS=',' read -r -a dns_servers_array <<< "$DNS_SERVERS"
-    if [[ ${#dns_servers_array[@]} -gt 0 ]]; then
-      nameserver_block=$'    nameservers:\n'
-      for server in "${dns_servers_array[@]}"; do
-        server="${server//[[:space:]]/}"
-        [[ -n "$server" ]] || continue
-        nameserver_block+=$'      - '"$server"$'\n'
-      done
-    fi
+    for server in "${dns_servers_array[@]}"; do
+      server="${server//[[:space:]]/}"
+      [[ -n "$server" ]] || continue
+      nameservers+=("$server")
+    done
   fi
 
   if [[ -n "${DNS_DOMAIN:-}" ]]; then
-    search_domain_block=$'    searchDomains:\n      - '"$DNS_DOMAIN"$'\n'
+    search_domains+=("$DNS_DOMAIN")
   fi
 
   {
+    # Talos v1.14 moved most machine/cluster settings into standalone config
+    # documents. Setting those fields on the legacy v1alpha1 config while the
+    # generated documents are present makes the machine reject the config with
+    # "already set in v1alpha1 config" errors, so only the fields that are
+    # still legacy stay under `machine:` below.
     echo "machine:"
-    echo "  nodeLabels:"
-    echo "    twinbox.io/role: ${role_label}"
-    if [[ "$type" == "worker" ]]; then
-      echo "    node.longhorn.io/create-default-disk: \"true\""
-    fi
-    # Worker nodes run many small pods; the Talos default of 110 maxPods caps a
-    # high-core worker (e.g. 10 cores) while CPU/memory are still free. Derive a
-    # per-node limit from its vCPU count so small workers keep the safe default
-    # and larger ones scale up. Override explicitly via TWINBOX_MAX_PODS.
-    # maxPods must live under kubelet.extraConfig (a KubeletConfiguration
-    # override); a bare kubelet.maxPods key is rejected by Talos config parsing.
-    if [[ "$type" == "worker" ]]; then
-      local node_max_pods="${TWINBOX_MAX_PODS:-}"
-      if [[ -z "$node_max_pods" ]]; then
-        node_max_pods="$(( cpu_cores * 15 ))"
-        if (( node_max_pods < 110 )); then
-          node_max_pods=110
-        fi
-      fi
-      if [[ ! "$node_max_pods" =~ ^[0-9]+$ ]]; then
-        fail "TWINBOX_MAX_PODS must be a non-negative integer, got: ${node_max_pods}"
-      fi
-      echo "  kubelet:"
-      echo "    extraConfig:"
-      echo "      maxPods: ${node_max_pods}"
-    fi
     # Collabora-based document servers create a user namespace for each jail.
     # Talos defaults this kernel limit to zero, which prevents those editors from starting.
     echo "  sysctls:"
     echo "    user.max_user_namespaces: \"11255\""
     echo "  network:"
-    [[ -n "$nameserver_block" ]] && printf '%s' "$nameserver_block"
-    [[ -n "$search_domain_block" ]] && printf '%s' "$search_domain_block"
     echo "    interfaces:"
     echo "      - deviceSelector:"
     echo "          hardwareAddr: ${mac}"
@@ -1498,34 +1474,92 @@ write_node_patch() {
       echo "        vip:"
       echo "          ip: ${VIP_IP}"
     fi
-    if [[ -n "${image_installer:-}" ]]; then
-      echo "  install:"
-      echo "    image: ${image_installer}"
-    fi
     echo "  time:"
     echo "    servers:"
     echo "      - ${time_server}"
-    echo "  features:"
-    echo "    kubePrism:"
-    echo "      enabled: true"
-    echo "      port: 7445"
-    echo "    hostDNS:"
-    echo "      forwardKubeDNSToHost: false"
-echo "cluster:"
-echo "  network:"
-echo "    cni:"
-echo "      name: none"
-echo "  proxy:"
-echo "    disabled: true"
-if [[ "$type" == "controlplane" ]]; then
-  echo "  apiServer:"
-  echo "    resources:"
-  echo "      requests:"
-  echo "        cpu: 500m"
-  echo "        memory: 1Gi"
-  echo "      limits:"
-  echo "        memory: 2Gi"
-fi
+
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: KubeNodeConfig"
+    echo "labels:"
+    echo "  twinbox.io/role: ${role_label}"
+    if [[ "$type" == "worker" ]]; then
+      echo "  node.longhorn.io/create-default-disk: \"true\""
+    fi
+
+    # Worker nodes run many small pods; the Talos default of 110 maxPods caps a
+    # high-core worker (e.g. 10 cores) while CPU/memory are still free. Derive a
+    # per-node limit from its vCPU count so small workers keep the safe default
+    # and larger ones scale up. Override explicitly via TWINBOX_MAX_PODS.
+    # maxPods must live under KubeletConfig.config (a KubeletConfiguration
+    # override); a bare maxPods key is rejected by Talos config parsing.
+    if [[ "$type" == "worker" ]]; then
+      local node_max_pods="${TWINBOX_MAX_PODS:-}"
+      if [[ -z "$node_max_pods" ]]; then
+        node_max_pods="$(( cpu_cores * 15 ))"
+        if (( node_max_pods < 110 )); then
+          node_max_pods=110
+        fi
+      fi
+      if [[ ! "$node_max_pods" =~ ^[0-9]+$ ]]; then
+        fail "TWINBOX_MAX_PODS must be a non-negative integer, got: ${node_max_pods}"
+      fi
+      echo "---"
+      echo "apiVersion: v1alpha1"
+      echo "kind: KubeletConfig"
+      echo "config:"
+      echo "  maxPods: ${node_max_pods}"
+    fi
+
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: ResolverConfig"
+    if [[ ${#nameservers[@]} -gt 0 ]]; then
+      echo "nameservers:"
+      for server in "${nameservers[@]}"; do
+        echo "  - address: ${server}"
+      done
+    fi
+    if [[ ${#search_domains[@]} -gt 0 ]]; then
+      echo "searchDomains:"
+      echo "  domains:"
+      for domain in "${search_domains[@]}"; do
+        echo "    - ${domain}"
+      done
+    fi
+    echo "hostDNS:"
+    echo "  forwardKubeDNSToHost: false"
+
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: KubePrismConfig"
+    echo "port: 7445"
+
+    # Twinbox installs Cilium itself, so the default Flannel CNI document is
+    # deleted instead of configured.
+    echo "---"
+    echo "apiVersion: v1alpha1"
+    echo "kind: KubeFlannelCNIConfig"
+    echo "\$patch: delete"
+
+    # kube-proxy is cluster-wide and Talos only allows this document on control
+    # plane machines.
+    if [[ "$type" == "controlplane" ]]; then
+      echo "---"
+      echo "apiVersion: v1alpha1"
+      echo "kind: KubeProxyConfig"
+      echo "enabled: false"
+
+      echo "---"
+      echo "apiVersion: v1alpha1"
+      echo "kind: KubeAPIServerConfig"
+      echo "resources:"
+      echo "  requests:"
+      echo "    cpu: 500m"
+      echo "    memory: 1Gi"
+      echo "  limits:"
+      echo "    memory: 2Gi"
+    fi
   } > "$patch_file"
 }
 
@@ -1598,7 +1632,8 @@ generate_talos_configs() {
   talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
     --output-dir "$base_dir" \
     --with-secrets "$talos_secrets_file" \
-    --install-disk "$INSTALL_DISK"
+    --install-disk "$INSTALL_DISK" \
+    --install-image "$image_installer"
 
   cp "$base_dir/talosconfig" "$talosconfig_file"
   upsert_secret_artifact "talos-secrets" "secrets.yaml" "$talos_secrets_file"
@@ -1616,16 +1651,19 @@ generate_talos_configs() {
       controlplane_patch_file="$node_dir/controlplane-patch.yaml"
       cp "$patch_file" "$controlplane_patch_file"
       {
-        echo "  inlineManifests:"
-        echo "    - name: cilium"
-        echo "      contents: |"
-        sed 's/^/        /' "$cilium_manifest_file"
+        echo "---"
+        echo "apiVersion: v1alpha1"
+        echo "kind: KubeInlineManifestConfig"
+        echo "name: cilium"
+        echo "manifest: |"
+        sed 's/^/    /' "$cilium_manifest_file"
       } >> "$controlplane_patch_file"
       append_hostname_config_patch "$name" "$controlplane_patch_file"
       talosctl gen config "$NAME" "https://${VIP_IP}:6443" \
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
         --install-disk "$INSTALL_DISK" \
+        --install-image "$image_installer" \
         --config-patch-control-plane "@${controlplane_patch_file}"
       config_file="$runtime_talos_dir/${name}-controlplane.yaml"
       cp "$node_dir/controlplane.yaml" "$config_file"
@@ -1635,6 +1673,7 @@ generate_talos_configs() {
         --output-dir "$node_dir" \
         --with-secrets "$talos_secrets_file" \
         --install-disk "$INSTALL_DISK" \
+        --install-image "$image_installer" \
         --config-patch-worker "@${patch_file}"
       config_file="$runtime_talos_dir/${name}-worker.yaml"
       cp "$node_dir/worker.yaml" "$config_file"
