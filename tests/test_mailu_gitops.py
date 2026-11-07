@@ -445,6 +445,17 @@ def test_mailu_dkim_parser_uses_mailu_dns_dkim_export():
     )
 
 
+def test_mailu_installer_does_not_corrupt_step_inputs_json():
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
+
+    # `${STEP_INPUTS_JSON:-{}}` appends a literal `}` when the variable is set,
+    # which makes every later jq call fail.
+    assert "STEP_INPUTS_JSON:-{}}" not in script
+    assert "[[ -n \"$STEP_INPUTS_JSON\" ]] || STEP_INPUTS_JSON='{}'" in script
+
+
 def test_mailu_installer_chooses_storage_node_by_capacity_and_disk():
     script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
         encoding="utf-8"

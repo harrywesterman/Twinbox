@@ -4,7 +4,9 @@ set -euo pipefail
 : "${STEP_CONTEXT_JSON:?missing STEP_CONTEXT_JSON}"
 : "${KUBECONFIG_FILE:?missing KUBECONFIG_FILE}"
 MANAGER_DATA_DIR="${MANAGER_DATA_DIR:-/data}"
-STEP_INPUTS_JSON="${STEP_INPUTS_JSON:-{}}"
+# `${VAR:-{}}` would append a literal `}` when VAR is set and corrupt the JSON.
+STEP_INPUTS_JSON="${STEP_INPUTS_JSON:-}"
+[[ -n "$STEP_INPUTS_JSON" ]] || STEP_INPUTS_JSON='{}'
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 # shellcheck disable=SC1091

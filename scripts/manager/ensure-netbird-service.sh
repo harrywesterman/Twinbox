@@ -379,8 +379,11 @@ check_existing_service() {
 }
 
 EXISTING_SERVICE_JSON="$(check_existing_service)" || fail_netbird "Could not query NetBird reverse proxy services for ${SERVICE_NAME}. Check the NetBird API token and management URL."
-EXISTING_SERVICE_ID="$(jq -r '.id // empty' <<<"${EXISTING_SERVICE_JSON:-{}}")"
-EXISTING_ACCESS_RESTRICTIONS="$(jq -c '.access_restrictions // {}' <<<"${EXISTING_SERVICE_JSON:-{}}")"
+# `${VAR:-{}}` is not a safe default in bash: it appends a literal `}` when VAR
+# is set, which corrupts the JSON.
+[[ -n "$EXISTING_SERVICE_JSON" ]] || EXISTING_SERVICE_JSON='{}'
+EXISTING_SERVICE_ID="$(jq -r '.id // empty' <<<"$EXISTING_SERVICE_JSON")"
+EXISTING_ACCESS_RESTRICTIONS="$(jq -c '.access_restrictions // {}' <<<"$EXISTING_SERVICE_JSON")"
 
 # 3. Build the service payload. The network step creates the Traefik resource
 # and writes its ID to the network secret; the live cluster resources endpoint

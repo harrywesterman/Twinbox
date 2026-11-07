@@ -182,7 +182,12 @@ def test_new_netbird_service_defaults_to_enforce():
     assert 'CROWDSEC_MODE="enforce"' in text
     assert "access_restrictions: ($access_restrictions + {crowdsec_mode: $crowdsec_mode})" in text
     assert "EXISTING_ACCESS_RESTRICTIONS" in text
+    # `${VAR:-{}}` appends a literal `}` when VAR is set, so re-running against
+    # an existing service fed invalid JSON to jq.
+    assert "EXISTING_SERVICE_JSON:-{}}" not in text
+    assert "[[ -n \"$EXISTING_SERVICE_JSON\" ]] || EXISTING_SERVICE_JSON='{}'" in text
     bootstrap = (ROOT / "scripts" / "manager" / "netbird-bastion-bootstrap-template.sh").read_text(
         encoding="utf-8"
     )
     assert 'ENABLE_CROWDSEC="true"' in bootstrap
+    assert '"NB_PROXY_PRIVATE": "true"' in bootstrap
