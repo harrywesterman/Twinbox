@@ -3,7 +3,7 @@ controllers:
     containers:
       main:
         image:
-          tag: v3.0.0
+          tag: v3.3.6
         env:
           DB_HOSTNAME: immich-db-pooler-rw-session.databases.svc.cluster.local
           DB_PORT: "5432"
