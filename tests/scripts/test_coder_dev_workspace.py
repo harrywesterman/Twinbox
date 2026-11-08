@@ -32,22 +32,18 @@ def test_dev_workspace_image_contains_browser_agent_tooling():
     assert "npx playwright install --with-deps chromium" in text
     assert "https://cli.github.com/packages/githubcli-archive-keyring.gpg" in text
     assert "apt-get install -y --no-install-recommends gh" in text
-    assert "ARG CODE_SERVER_VERSION=4.143.1" in text
+    # Renovate bumps these pins, so assert the pin format instead of a literal
+    # version/checksum (which would make every dependency PR red).
+    assert re.search(r"^ARG CODE_SERVER_VERSION=\d+\.\d+\.\d+$", text, re.MULTILINE)
     pinned_defaults = (WORKSPACE_ROOT / "config" / "pinned-defaults.sh").read_text(encoding="utf-8")
     for name in ("KUBECTL", "HELM", "K9S", "TALOS", "OPENTOFU"):
         version = re.search(rf"^PINNED_{name}_VERSION=(\S+)$", pinned_defaults, re.MULTILINE)
         assert version is not None
         assert f"ARG {name}_VERSION={version.group(1)}" in text
-    assert "ARG OPKSSH_VERSION=0.19.1" in text
-    assert (
-        "ARG OPKSSH_SHA256_AMD64=8a968688c940229327ff4dac470bbfbbd50cd6a57b301644d8a529d9749bf6be"
-        in text
-    )
-    assert "ARG SHELL_QUOTE_VERSION=1.11.0" in text
-    assert (
-        "ARG SHELL_QUOTE_SHA512=25dc433c3d03053caed3ca6ad243c2d3148d7adfeab14d3ba93e88b17d404bca0ed8808d458e2574d6bc38023a3eec001fcb46de5c4485baa6ca9e03c38d37ea"
-        in text
-    )
+    assert re.search(r"^ARG OPKSSH_VERSION=\d+\.\d+\.\d+$", text, re.MULTILINE)
+    assert re.search(r"^ARG OPKSSH_SHA256_AMD64=[0-9a-f]{64}$", text, re.MULTILINE)
+    assert re.search(r"^ARG SHELL_QUOTE_VERSION=\d+\.\d+\.\d+$", text, re.MULTILINE)
+    assert re.search(r"^ARG SHELL_QUOTE_SHA512=[0-9a-f]{128}$", text, re.MULTILINE)
     assert "code-server_${CODE_SERVER_VERSION}_${TARGETARCH}.deb" in text
     assert 'npm pack "shell-quote@${SHELL_QUOTE_VERSION}" --pack-destination /tmp' in text
     assert "sha512sum -c -" in text

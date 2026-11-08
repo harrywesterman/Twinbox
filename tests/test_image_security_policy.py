@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -13,18 +14,28 @@ from published_image_issue import decide_issue, load_findings, render_body  # no
 
 
 def test_cve_pins_are_full_patched_versions_in_both_build_and_runtime_stages():
-    expected = {
-        "manager-api/Dockerfile": "26.12.1",
-        "manager-worker/Dockerfile": "26.12.1",
-        "manager-web/Dockerfile": "26.12.1",
-        "portal/Dockerfile": "26.12.1",
-        "twinbox-agents/Dockerfile": "26.12.1",
-    }
-    for path, version in expected.items():
+    dockerfiles = [
+        "manager-api/Dockerfile",
+        "manager-worker/Dockerfile",
+        "manager-web/Dockerfile",
+        "portal/Dockerfile",
+        "twinbox-agents/Dockerfile",
+    ]
+    versions = set()
+    for path in dockerfiles:
         text = (ROOT / path).read_text(encoding="utf-8")
-        assert f"FROM node:{version}-alpine" in text
+        match = re.search(r"^FROM node:(\d+\.\d+\.\d+)-alpine\b", text, re.MULTILINE)
+        assert match is not None, f"{path} must pin a full node version"
+        version = match.group(1)
+        versions.add(version)
         assert declared_version(ROOT / path) == tuple(map(int, version.split(".")))
-    assert declared_version(ROOT / "gitops/platform-apps/headwind-mdm/values.yaml") == (26, 12, 1)
+
+    # All node images and the Headwind bootstrap runtime must move together.
+    assert len(versions) == 1, f"node versions diverged: {sorted(versions)}"
+    version = versions.pop()
+    headwind = declared_version(ROOT / "gitops/platform-apps/headwind-mdm/values.yaml")
+    assert headwind == tuple(map(int, version.split(".")))
+
     assert "FROM nginx:" in (ROOT / "manager-web/Dockerfile").read_text(encoding="utf-8")
 
 

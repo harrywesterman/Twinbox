@@ -16,8 +16,8 @@ ARG TALOS_VERSION=v1.14.5
 # renovate: depName=opentofu/opentofu
 ARG OPENTOFU_VERSION=v1.13.2
 # renovate: depName=openpubkey/opkssh
-ARG OPKSSH_VERSION=0.19.1
-ARG OPKSSH_SHA256_AMD64=8a968688c940229327ff4dac470bbfbbd50cd6a57b301644d8a529d9749bf6be
+ARG OPKSSH_VERSION=0.19.2
+ARG OPKSSH_SHA256_AMD64=e799b780d5477e8d986a2e6784773ebb2451d860dd842d23e271baf88aee2da3
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
