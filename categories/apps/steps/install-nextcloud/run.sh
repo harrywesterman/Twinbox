@@ -464,7 +464,9 @@ provision_nextcloud_scim() {
     log "SCIM provider $provider_pk already bound as backchannel on application $app_pk"
   else
     final_bc="$(jq -c --argjson add "$provider_pk" '.backchannel_providers + [$add] | unique' <<<"$app_json")"
-    authentik_api_write PATCH "/core/applications/${app_pk}/" "{\"backchannel_providers\": ${final_bc}}" >/dev/null
+    # Authentik resolves application detail routes by slug, not by pk; PATCHing the
+    # pk returns 404 "No Application matches the given query".
+    authentik_api_write PATCH "/core/applications/nextcloud/" "{\"backchannel_providers\": ${final_bc}}" >/dev/null
     log "Bound SCIM provider $provider_pk as backchannel on application $app_pk (primary provider $app_primary untouched)"
   fi
 

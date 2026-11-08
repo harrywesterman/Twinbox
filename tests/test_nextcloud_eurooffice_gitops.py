@@ -666,3 +666,15 @@ def test_collabora_is_privileged_for_document_jail_mounts():
         "pod-security.kubernetes.io/audit": "privileged",
         "pod-security.kubernetes.io/warn": "privileged",
     }
+
+
+def test_nextcloud_scim_backchannel_patch_targets_application_slug():
+    script = INSTALL_STEP.read_text(encoding="utf-8")
+
+    # Authentik's /core/applications/<pk>/ detail route does not resolve by pk;
+    # it returns 404 "No Application matches the given query". Use the slug.
+    assert 'authentik_api_write PATCH "/core/applications/${app_pk}/"' not in script
+    assert (
+        'authentik_api_write PATCH "/core/applications/nextcloud/" '
+        '"{\\"backchannel_providers\\": ${final_bc}}"' in script
+    )
