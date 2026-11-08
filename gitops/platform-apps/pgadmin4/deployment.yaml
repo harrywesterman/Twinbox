@@ -84,7 +84,11 @@ spec:
               mountPath: /work
       containers:
         - name: pgadmin4
-          image: dpage/pgadmin4:9.19
+          # Pinned to 9.18: 9.19 reworked pgAdmin's passexec handling
+          # (prepare_passexec_data / passexec_api_fields) so the shared-server
+          # passexec patches below no longer match and the container exits with
+          # "Could not patch pgAdmin shared server passexec handling".
+          image: dpage/pgadmin4:9.18
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
