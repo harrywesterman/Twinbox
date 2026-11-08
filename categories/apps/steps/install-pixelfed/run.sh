@@ -56,6 +56,11 @@ wait_for_resource_ready() {
   done
 }
 
+run_pixelfed_artisan() {
+  kubectl -n pixelfed exec deployment/pixelfed -- \
+    su --preserve-environment www-data --shell /bin/bash --command "php artisan $*"
+}
+
 find_oauth2_provider_pk_by_name() {
   local provider_name="$1"
   local response
@@ -335,15 +340,15 @@ bash "$WORKSPACE_ROOT/scripts/manager/sync-pgadmin4-server.sh" \
 kubectl -n pixelfed rollout status deployment/pixelfed --timeout=10m >/dev/null
 
 log "Bootstrapping Pixelfed federation and OAuth keys"
-kubectl -n pixelfed exec deployment/pixelfed -- php artisan instance:actor
+run_pixelfed_artisan instance:actor
 
-if ! kubectl -n pixelfed exec deployment/pixelfed -- test -f /var/www/html/storage/oauth-private.key >/dev/null 2>&1; then
-  kubectl -n pixelfed exec deployment/pixelfed -- php artisan passport:keys --force
+if ! kubectl -n pixelfed exec deployment/pixelfed -- test -f /var/www/storage/oauth-private.key >/dev/null 2>&1; then
+  run_pixelfed_artisan passport:keys --force
 fi
 
-kubectl -n pixelfed exec deployment/pixelfed -- php artisan config:cache
-kubectl -n pixelfed exec deployment/pixelfed -- php artisan route:cache
-kubectl -n pixelfed exec deployment/pixelfed -- php artisan view:cache
+run_pixelfed_artisan config:cache
+run_pixelfed_artisan route:cache
+run_pixelfed_artisan view:cache
 
 if [[ -n "${STEP_RESULT_FILE:-}" ]]; then
   jq -n \

@@ -173,6 +173,9 @@ spec:
               value: "admin@pixelfed.__ZONE_NAME__"
             - name: ENTRYPOINT_SKIP_SCRIPTS
               value: 01-permissions.sh
+          securityContext:
+            runAsUser: 33
+            runAsGroup: 33
           readinessProbe:
             exec:
               command:
@@ -378,6 +381,9 @@ spec:
               value: "admin@pixelfed.__ZONE_NAME__"
             - name: ENTRYPOINT_SKIP_SCRIPTS
               value: 01-permissions.sh
+          securityContext:
+            runAsUser: 33
+            runAsGroup: 33
           volumeMounts:
             - name: pixelfed-data
               mountPath: /var/www/storage

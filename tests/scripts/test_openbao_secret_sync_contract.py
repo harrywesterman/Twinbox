@@ -877,8 +877,9 @@ def test_pixelfed_step_and_secret_project_activitypub_and_bootstrap_keys():
         '--required-keys "APP_KEY,PIXELFED_POSTGRESQL__USERNAME,PIXELFED_POSTGRESQL__PASSWORD,PF_OIDC_CLIENT_ID,PF_OIDC_CLIENT_SECRET,PF_OIDC_AUTHORIZE_URL,PF_OIDC_TOKEN_URL,PF_OIDC_PROFILE_URL,PF_OIDC_LOGOUT_URL"'
         in step_text
     )
-    assert "php artisan instance:actor" in step_text
-    assert "php artisan passport:keys --force" in step_text
+    assert "su --preserve-environment www-data" in step_text
+    assert "run_pixelfed_artisan instance:actor" in step_text
+    assert "run_pixelfed_artisan passport:keys --force" in step_text
     assert "apply-argocd-application.sh" in step_text
     assert '--application "pixelfed"' in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text

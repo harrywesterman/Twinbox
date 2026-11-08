@@ -4737,8 +4737,11 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "apply-argocd-application.sh" in step_text
     assert '--application "pixelfed"' in step_text
     assert "gitops/apps/pixelfed.yaml" in step_text
-    assert "php artisan instance:actor" in step_text
-    assert "php artisan passport:keys --force" in step_text
+    assert "su --preserve-environment www-data" in step_text
+    assert "run_pixelfed_artisan instance:actor" in step_text
+    assert "run_pixelfed_artisan passport:keys --force" in step_text
+    assert "/var/www/storage/oauth-private.key" in step_text
+    assert "/var/www/html/storage/oauth-private.key" not in step_text
     assert "Provisioning Authentik OIDC client for Pixelfed" in step_text
     assert "delete_group_binding()" in step_text
     assert 'delete_group_binding "$application_uuid" "$admins_group_id"' in step_text
@@ -4778,6 +4781,10 @@ def test_pixelfed_manifests_use_postgresql_and_longhorn_storage():
     assert "/var/www/html/storage" not in workers_text
     assert "fsGroup: 33" in deployment_text
     assert workers_text.count("fsGroup: 33") == 2
+    # Worker and scheduler override the image entrypoint and run artisan as the
+    # runtime user, so they cannot create root-owned files on the shared PVC.
+    assert workers_text.count("runAsUser: 33") == 2
+    assert workers_text.count("runAsGroup: 33") == 2
     assert deployment_text.count("emptyDir: {}") == 1
     assert workers_text.count("emptyDir: {}") == 2
     assert "name: prepare-pixelfed-storage" in deployment_text
