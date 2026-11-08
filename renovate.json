@@ -219,6 +219,13 @@
       "groupSlug": "{{manager}}-{{depName}}"
     },
     {
+      "description": "Group node image bumps across Dockerfile and GitOps managers so build and runtime pins stay in sync",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "groupName": "node.js",
+      "groupSlug": "node"
+    },
+    {
       "description": "Automerge Helm chart and container image non-major updates with timestamp-tolerant release-age checks",
       "matchDatasources": ["helm", "docker"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
