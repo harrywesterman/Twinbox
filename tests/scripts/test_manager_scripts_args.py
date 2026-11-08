@@ -1124,6 +1124,20 @@ def test_ai_endpoint_is_asked_before_the_agents_step():
         assert f'id: "{field}"' in question_text
 
 
+def test_configure_dns_syncs_cloudflare_token_for_cert_manager():
+    text = (
+        REPO_ROOT / "categories" / "talos-cluster" / "steps" / "configure-dns" / "run.sh"
+    ).read_text(encoding="utf-8")
+
+    # cert-manager reads twinbox/global/cloudflare-token via the
+    # cert-manager-cloudflare ExternalSecret; configure-dns must seed it.
+    assert "sync-openbao-global-secret.sh" in text
+    assert '--secret-name "cloudflare-token"' in text
+    assert "CLOUDFLARE_API_TOKEN" in text
+    assert "cert-manager-cloudflare" in text
+    assert "external-dns-credentials" in text
+
+
 def test_seaweedfs_object_store_is_standard_cluster_step_for_app_media_only():
     journey_text = MANAGER_WEB_JOURNEY.read_text(encoding="utf-8")
     setup_step_ids = journey_text.split("const FIXED_SETUP_STEP_IDS = [", 1)[1].split(

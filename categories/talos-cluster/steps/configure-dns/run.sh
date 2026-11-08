@@ -81,6 +81,21 @@ esac
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Credentials stored in secret/external-dns-credentials"
 
+# cert-manager reads the Cloudflare token from OpenBao through the
+# cert-manager-cloudflare ExternalSecret. Keep both stores in sync so the
+# letsencrypt-cloudflare ClusterIssuer can solve DNS-01 challenges.
+if [[ "$dns_provider" == "cloudflare" ]]; then
+  cloudflare_secret_file="$(mktemp "${TMPDIR:-/tmp}/twinbox-cloudflare-token-XXXXXX")"
+  trap 'rm -f "$cloudflare_secret_file"' EXIT
+  jq -n --arg token "$dns_api_token" '{CLOUDFLARE_API_TOKEN: $token}' >"$cloudflare_secret_file"
+  chmod 0600 "$cloudflare_secret_file"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing Cloudflare API token to OpenBao for cert-manager"
+  bash "$WORKSPACE_ROOT/scripts/manager/sync-openbao-global-secret.sh" \
+    --secret-name "cloudflare-token" \
+    --json-file "$cloudflare_secret_file" \
+    --required-keys "CLOUDFLARE_API_TOKEN"
+fi
+
 # Render and apply the Argo CD Application manifest
 repo_url="${TWINBOX_GIT_REPO_URL:-https://github.com/harrywesterman/Twinbox.git}"
 target_rev="${TWINBOX_GIT_TARGET_REVISION:-main}"
