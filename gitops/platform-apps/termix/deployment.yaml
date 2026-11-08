@@ -17,7 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: termix
       annotations:
-        twinbox.dev/termix-patch-revision: "2026-07-31-opkssh-directory-permissions"
+        twinbox.dev/termix-patch-revision: "2026-11-08-opkssh-single-listener-callback"
     spec:
       securityContext:
         fsGroup: 1000

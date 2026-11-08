@@ -4519,6 +4519,12 @@ data:
         });
         return html;
     }
+    function resolveOPKSSHCallbackPort(session) {
+        // OPKSSH releases that serve /login and /login-callback on the same listener
+        // never print a "listening on http://127.0.0.1:PORT/" line, so callbackPort
+        // stays 0. Fall back to the chooser listener in that case.
+        return session.callbackPort || session.localPort || 0;
+    }
     function rewriteOPKSSHCallbackCookies(value) {
         // Rewrite cookies from OPKSSH's internal listener so they are scoped
         // to the Termix proxy path instead of OPKSSH's internal path.
@@ -5065,7 +5071,8 @@ data:
                 return;
             }
             const session = userSessions[userSessions.length - 1];
-            if (!session.callbackPort) {
+            const callbackPort = resolveOPKSSHCallbackPort(session);
+            if (!callbackPort) {
                 sshLogger.error("Session callback port not ready", {
                     operation: "opkssh_callback_port_not_ready",
                     userId,
@@ -5086,7 +5093,7 @@ data:
                 operation: "opkssh_static_callback_redirect",
                 userId,
                 requestId: session.requestId,
-                callbackPort: session.callbackPort,
+                callbackPort,
                 queryParams: Object.keys(req.query),
                 redirectUrl,
             });
@@ -5147,7 +5154,8 @@ data:
             const targetPath = pathAfterRequestId === "" || pathAfterRequestId.startsWith("?")
                 ? `/login-callback${pathAfterRequestId}`
                 : pathAfterRequestId;
-            if (!session.callbackPort || session.callbackPort === 0) {
+            const callbackPort = resolveOPKSSHCallbackPort(session);
+            if (!callbackPort) {
                 sshLogger.error("OPKSSH callback session has no callback port", {
                     operation: "opkssh_callback_proxy",
                     requestId,
@@ -5161,13 +5169,13 @@ data:
                 }));
                 return;
             }
-            const targetUrl = `http://127.0.0.1:${session.callbackPort}${targetPath}`;
+            const targetUrl = `http://127.0.0.1:${callbackPort}${targetPath}`;
             const response = await axios({
                 method: req.method,
                 url: targetUrl,
                 headers: {
                     ...req.headers,
-                    host: `127.0.0.1:${session.callbackPort}`,
+                    host: `127.0.0.1:${callbackPort}`,
                 },
                 data: req.body,
                 timeout: 10000,

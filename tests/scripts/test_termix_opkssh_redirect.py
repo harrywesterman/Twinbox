@@ -33,6 +33,19 @@ class TestTermixOpksshRedirect(unittest.TestCase):
         )
         self.assertIn("res.setHeader(key, rewriteOPKSSHCallbackCookies(value));", text)
 
+    def test_opkssh_callback_falls_back_to_single_listener_port(self):
+        text = TERMIX_CONFIGMAP.read_text(encoding="utf-8")
+
+        self.assertIn("function resolveOPKSSHCallbackPort(session)", text)
+        self.assertIn("return session.callbackPort || session.localPort || 0;", text)
+        self.assertEqual(text.count("const callbackPort = resolveOPKSSHCallbackPort(session);"), 2)
+        self.assertEqual(text.count("if (!callbackPort) {"), 2)
+        self.assertNotIn(
+            "if (!session.callbackPort || session.callbackPort === 0) {", text
+        )
+        self.assertIn("const targetUrl = `http://127.0.0.1:${callbackPort}${targetPath}`;", text)
+        self.assertIn("host: `127.0.0.1:${callbackPort}`", text)
+
     def test_opkssh_provider_redirect_uri_stays_strict_https(self):
         text = OPKSSH_SETUP.read_text(encoding="utf-8")
 
