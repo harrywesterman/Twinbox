@@ -502,7 +502,7 @@ sync_mailu_mailboxes() {
     encoded_email="$(printf '%s' "$email" | python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip()))')"
 
     local check_status
-    check_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -- \
+    check_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -i -- \
       env MAILU_API_TOKEN="$api_token" MAILU_API_PATH="/user/${encoded_email}" \
       sh -s <<'SH' 2>/dev/null || echo "000"
 set -eu
@@ -531,7 +531,7 @@ SH
     )"
 
     local create_status
-    create_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -- \
+    create_status="$(kubectl -n mailu exec deploy/mailu-admin -c admin -i -- \
       env MAILU_API_TOKEN="$api_token" MAILU_API_BODY_B64="$create_payload_b64" \
       sh -s <<'SH' 2>/dev/null || echo "000"
 set -eu

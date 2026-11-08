@@ -487,6 +487,19 @@ def test_mailu_installer_rejects_full_nodes_and_fails_loudly():
     assert "No Ready schedulable worker has capacity to host Mailu" in script
 
 
+def test_mailu_mailbox_sync_pipes_scripts_into_kubectl_exec_stdin():
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
+
+    # `sh -s` reads the request/creation script from stdin, so kubectl exec must
+    # attach stdin with -i. Without it the script never runs, curl prints nothing,
+    # and every mailbox is reported as failed with an empty HTTP status.
+    assert "kubectl -n mailu exec deploy/mailu-admin -c admin -i --" in script
+    assert "kubectl -n mailu exec deploy/mailu-admin -c admin --" not in script
+    assert script.count("kubectl -n mailu exec deploy/mailu-admin -c admin -i --") == 2
+
+
 def test_mailu_installer_authentik_registration_is_idempotent_and_match_by_name():
     script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
         encoding="utf-8"
