@@ -40,9 +40,7 @@ class TestTermixOpksshRedirect(unittest.TestCase):
         self.assertIn("return session.callbackPort || session.localPort || 0;", text)
         self.assertEqual(text.count("const callbackPort = resolveOPKSSHCallbackPort(session);"), 2)
         self.assertEqual(text.count("if (!callbackPort) {"), 2)
-        self.assertNotIn(
-            "if (!session.callbackPort || session.callbackPort === 0) {", text
-        )
+        self.assertNotIn("if (!session.callbackPort || session.callbackPort === 0) {", text)
         self.assertIn("const targetUrl = `http://127.0.0.1:${callbackPort}${targetPath}`;", text)
         self.assertIn("host: `127.0.0.1:${callbackPort}`", text)
 
