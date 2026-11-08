@@ -478,19 +478,37 @@ sync_mailu_mailboxes() {
     return 0
   fi
 
-  local users_json
+  local all_users_json users_json skipped_json
 
   log "Syncing Mailu mailboxes for existing Authentik users"
 
-  users_json="$(authentik_api_get "/core/users/" 2>/dev/null | jq '[.results[] | select(.email != null and .email != "") | {email, name, username}]')"
-  if [[ -z "$users_json" || "$users_json" == "null" || "$users_json" == "[]" ]]; then
+  all_users_json="$(authentik_api_get "/core/users/" 2>/dev/null | jq '[.results[] | select(.email != null and .email != "") | {email, name, username}]')"
+  if [[ -z "$all_users_json" || "$all_users_json" == "null" || "$all_users_json" == "[]" ]]; then
     log "No Authentik users with email addresses found; skipping mailbox sync"
+    return 0
+  fi
+
+  # Only addresses in the Mailu-managed domain can become mailboxes; service
+  # accounts such as admin@<internal-domain> are skipped instead of failing.
+  users_json="$(jq --arg domain "$mail_domain" \
+    '[.[] | select((.email | ascii_downcase) | endswith("@" + ($domain | ascii_downcase)))]' \
+    <<<"$all_users_json")"
+  skipped_json="$(jq --arg domain "$mail_domain" \
+    '[.[] | select(((.email | ascii_downcase) | endswith("@" + ($domain | ascii_downcase))) | not) | .email]' \
+    <<<"$all_users_json")"
+  while IFS= read -r skipped_email; do
+    [[ -n "$skipped_email" ]] || continue
+    log "  SKIP ${skipped_email}: not in Mailu domain ${mail_domain}"
+  done < <(jq -r '.[]' <<<"$skipped_json")
+
+  if [[ "$users_json" == "[]" ]]; then
+    log "No Authentik users with an email in ${mail_domain}; skipping mailbox sync"
     return 0
   fi
 
   local total=0 created=0 existed=0 failed=0
   total="$(jq length <<<"$users_json")"
-  log "Found ${total} Authentik user(s) with email to sync"
+  log "Found ${total} Authentik user(s) with email in ${mail_domain} to sync"
 
   while IFS= read -r user_entry; do
     local email name displayed

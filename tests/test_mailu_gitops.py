@@ -500,6 +500,18 @@ def test_mailu_mailbox_sync_pipes_scripts_into_kubectl_exec_stdin():
     assert script.count("kubectl -n mailu exec deploy/mailu-admin -c admin -i --") == 2
 
 
+def test_mailu_mailbox_sync_skips_addresses_outside_the_mail_domain():
+    script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
+        encoding="utf-8"
+    )
+
+    # Authentik service accounts (e.g. admin@twinbox.local) are not in the Mailu
+    # domain and cannot be created; skip them instead of logging a failure.
+    assert '.email | ascii_downcase) | endswith("@" + ($domain | ascii_downcase))' in script
+    assert "SKIP ${skipped_email}: not in Mailu domain ${mail_domain}" in script
+    assert "No Authentik users with an email in ${mail_domain}; skipping mailbox sync" in script
+
+
 def test_mailu_installer_authentik_registration_is_idempotent_and_match_by_name():
     script = (REPO_ROOT / "categories" / "apps" / "steps" / "install-mailu" / "run.sh").read_text(
         encoding="utf-8"
