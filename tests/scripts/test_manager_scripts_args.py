@@ -1810,6 +1810,8 @@ def test_apply_argocd_application_helper_applies_and_waits_for_health():
 def test_stirling_pdf_waits_for_real_kubernetes_readiness():
     step_text = STIRLING_PDF_STEP_SCRIPT.read_text(encoding="utf-8")
     deployment_text = STIRLING_PDF_DEPLOYMENT.read_text(encoding="utf-8")
+    deployment = yaml.safe_load(deployment_text)
+    startup_probe = deployment["spec"]["template"]["spec"]["containers"][0]["startupProbe"]
     ingressroute_text = (
         REPO_ROOT / "gitops" / "platform-apps" / "stirling-pdf" / "ingressroute.yaml"
     ).read_text(encoding="utf-8")
@@ -1839,6 +1841,7 @@ def test_stirling_pdf_waits_for_real_kubernetes_readiness():
         in step_text
     )
     assert "tcpSocket:" in deployment_text
+    assert startup_probe["failureThreshold"] * startup_probe["periodSeconds"] >= 20 * 60
     assert "SECURITY_CUSTOMGLOBALAPIKEY" in deployment_text
     assert "ST_API_KEY_FOR_QR_CODE" not in deployment_text
     assert "mountPath: /configs" in deployment_text

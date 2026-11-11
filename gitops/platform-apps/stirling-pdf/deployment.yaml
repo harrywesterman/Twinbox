@@ -57,7 +57,7 @@ spec:
           startupProbe:
             tcpSocket:
               port: http
-            failureThreshold: 90
+            failureThreshold: 240
             periodSeconds: 5
           volumeMounts:
             - name: stirling-pdf-data
