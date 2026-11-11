@@ -219,10 +219,22 @@ resource "netbird_route" "management_lan" {
 }
 
 resource "netbird_route" "hetzner_internet_exit" {
-  network_id      = netbird_network.twinbox.id
+  network_id      = "${local.name_prefix}-bastion-exit"
   description     = "Hetzner bastion internet exit node"
   network         = "0.0.0.0/0"
   peer_groups     = [netbird_group.bastion_exit_routers.id]
+  groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]
+  masquerade      = true
+  metric          = 9999
+  enabled         = true
+  skip_auto_apply = var.exit_node_skip_auto_apply
+}
+
+resource "netbird_route" "home_internet_exit" {
+  network_id      = "${local.name_prefix}-home-exit"
+  description     = "Home network internet exit via Management VM"
+  network         = netbird_route.hetzner_internet_exit.network
+  peer_groups     = [netbird_group.management_lan_routers.id]
   groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]
   masquerade      = true
   metric          = 9999

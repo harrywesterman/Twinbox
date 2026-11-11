@@ -3,6 +3,7 @@ import path from "path";
 import { spawn, spawnSync } from "child_process";
 import { buildRedactor } from "../../lib/secrets/redact.mjs";
 import { isAiConfigSyncJobType, redactAiConfigLine } from "./ai-config-sync.mjs";
+import { startNetbirdClientSync } from "./netbird-client-sync.mjs";
 import {
   buildClusterWorkerSecretBundle,
   normalizeSecretBundle,
@@ -1612,6 +1613,7 @@ async function loop() {
 }
 
 console.log("manager-worker started");
+startNetbirdClientSync();
 try {
   recoverOrphanedRunningJobs();
   console.log("manager-worker recovered orphaned running jobs");

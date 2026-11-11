@@ -3286,6 +3286,23 @@ def test_netbird_lan_and_exit_routes_are_opt_in():
     )
     assert "masquerade      = true" in exit_body
     assert "skip_auto_apply = var.exit_node_skip_auto_apply" in exit_body
+    assert 'network_id      = "${local.name_prefix}-bastion-exit"' in exit_body
+
+    home_route = re.search(
+        r'resource\s+"netbird_route"\s+"home_internet_exit"\s+\{(.*?)\n\}',
+        network_text,
+        flags=re.DOTALL,
+    )
+    assert home_route
+    home_body = home_route.group(1)
+    assert 'network_id      = "${local.name_prefix}-home-exit"' in home_body
+    assert "network         = netbird_route.hetzner_internet_exit.network" in home_body
+    assert "peer_groups     = [netbird_group.management_lan_routers.id]" in home_body
+    assert (
+        "groups          = [netbird_group.admins.id, netbird_group.exit_node_users.id]" in home_body
+    )
+    assert "masquerade      = true" in home_body
+    assert "skip_auto_apply = var.exit_node_skip_auto_apply" in home_body
 
     assert 'protocol      = "icmp"' in network_text
     assert "exit_node_users_to_management_lan_routers_icmp" in network_text
