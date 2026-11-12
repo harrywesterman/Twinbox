@@ -16,6 +16,8 @@ spec:
       min_pool_size: "5"
   template:
     spec:
+      containers:
+        - name: pgbouncer
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname

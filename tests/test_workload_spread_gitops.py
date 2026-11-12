@@ -34,7 +34,15 @@ def test_cnpg_poolers_spread_instances_across_nodes():
 
     for path, pooler in poolers:
         name = pooler["metadata"]["name"]
-        constraints = pooler["spec"]["template"]["spec"]["topologySpreadConstraints"]
+        template_spec = pooler["spec"]["template"]["spec"]
+        constraints = template_spec["topologySpreadConstraints"]
+
+        # The CRD validates the template as a full PodSpec, which requires a
+        # container list. The operator keeps its own pgbouncer container and
+        # only merges the extra fields.
+        assert template_spec["containers"] == [{"name": "pgbouncer"}], (
+            f"{path} must declare the pgbouncer container the CRD requires"
+        )
 
         assert constraints == [
             {
