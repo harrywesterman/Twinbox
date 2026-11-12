@@ -14,3 +14,12 @@ spec:
       max_client_conn: "200"
       default_pool_size: "20"
       min_pool_size: "5"
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              cnpg.io/poolerName: penpot-db-pooler-rw-session

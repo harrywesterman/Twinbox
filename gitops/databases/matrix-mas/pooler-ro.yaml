@@ -13,3 +13,12 @@ spec:
     parameters:
       max_client_conn: "100"
       default_pool_size: "10"
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              cnpg.io/poolerName: matrix-mas-db-pooler-ro

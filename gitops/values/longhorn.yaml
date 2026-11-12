@@ -5,6 +5,13 @@ global:
   nodeSelector:
     twinbox.io/role: worker
 
+csi:
+  # Hard anti-affinity for the CSI controller deployments (attacher, provisioner,
+  # resizer, snapshotter). With the chart default ("soft") a mass reschedule can
+  # place all replicas of one controller on the same node, which overwhelms small
+  # workers and makes leader election compete with the workloads it serves.
+  podAntiAffinityPreset: hard
+
 defaultSettings:
   nodeDrainPolicy: allow-if-replica-is-stopped
   detachManuallyAttachedVolumesWhenCordoned: true

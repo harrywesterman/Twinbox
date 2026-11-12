@@ -13,6 +13,15 @@ spec:
     parameters:
       max_client_conn: "200"
       default_pool_size: "20"
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              cnpg.io/poolerName: CHANGEME-db-pooler-rw
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
@@ -29,3 +38,12 @@ spec:
     parameters:
       max_client_conn: "200"
       default_pool_size: "20"
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              cnpg.io/poolerName: CHANGEME-db-pooler-ro

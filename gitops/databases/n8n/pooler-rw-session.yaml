@@ -15,3 +15,12 @@ spec:
       default_pool_size: "20"
       min_pool_size: "5"
       ignore_startup_parameters: extra_float_digits,options,statement_timeout
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              cnpg.io/poolerName: n8n-db-pooler-rw-session
