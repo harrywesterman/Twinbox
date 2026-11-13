@@ -200,6 +200,10 @@ def test_jitsi_platform_overlay_provides_broker_secret_sync_service_and_ingress(
     assert "Host(`jitsi.__ZONE_NAME__`)" in ingress_text
     assert "Host(`auth-jitsi.__ZONE_NAME__`)" in ingress_text
     assert "name: jitsi-web" in ingress_text
+    # jitsi-meet 3.12.0 moved the jitsi-web service from port 80 to 8000, so the
+    # IngressRoutes must reference the service's named "http" port instead of a
+    # hard-coded number that goes stale on chart upgrades.
+    assert re.findall(r"name: jitsi-web\n\s+port: (\S+)", ingress_text) == ["http", "http"]
     assert "name: auth-jitsi" in ingress_text
     assert "webwiredoor" not in ingress_text
     assert "webtailscale" not in ingress_text

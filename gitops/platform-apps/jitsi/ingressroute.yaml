@@ -12,7 +12,7 @@ spec:
       services:
         - kind: Service
           name: jitsi-web
-          port: 80
+          port: http
   tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
@@ -29,7 +29,7 @@ spec:
       services:
         - kind: Service
           name: jitsi-web
-          port: 80
+          port: http
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
