@@ -13,10 +13,24 @@ spec:
       labels:
         app.kubernetes.io/name: netbird-routing-peer
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: netbird-routing-peer
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: netbird
           image: netbirdio/netbird:0.81.5
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 512Mi
           env:
             - name: NB_SETUP_KEY
               valueFrom:

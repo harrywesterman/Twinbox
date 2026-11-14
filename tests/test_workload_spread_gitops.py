@@ -27,6 +27,24 @@ def test_longhorn_csi_controllers_use_hard_anti_affinity():
     assert values["csi"]["podAntiAffinityPreset"] == "hard"
 
 
+def test_netbird_routers_have_reserved_resources_and_separate_nodes():
+    deployment = yaml.safe_load(
+        (REPO_ROOT / "gitops/platform-apps/netbird-routing-peers/deployment.yaml").read_text()
+    )
+    spec = deployment["spec"]["template"]["spec"]
+    terms = spec["affinity"]["podAntiAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]
+    assert terms == [
+        {
+            "labelSelector": {"matchLabels": deployment["spec"]["selector"]["matchLabels"]},
+            "topologyKey": "kubernetes.io/hostname",
+        }
+    ]
+    resources = spec["containers"][0]["resources"]
+    assert resources["requests"]["cpu"] == "100m"
+    assert resources["requests"]["memory"] == "128Mi"
+    assert resources["limits"]["memory"] == "512Mi"
+
+
 def test_cnpg_poolers_spread_instances_across_nodes():
     poolers = list(_pooler_documents())
 
