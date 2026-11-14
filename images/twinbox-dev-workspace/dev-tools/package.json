@@ -4,7 +4,7 @@
   "private": true,
   "description": "Pinned developer CLIs included in the Twinbox development workspace image",
   "dependencies": {
-    "@openai/codex": "0.165.0",
+    "@openai/codex": "0.169.0",
     "opencode-ai": "1.19.5",
     "playwright": "1.64.1"
   }
