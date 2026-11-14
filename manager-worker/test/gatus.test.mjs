@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
+import { loadCatalogDefinitions } from "../../lib/catalog-definitions.mjs";
 import {
   buildGatusConfig,
   buildGatusEndpoints,
@@ -98,6 +100,65 @@ test("monitoring opt-out removes cached internal monitors without removing their
   assert.equal(internal[0].dashy.items[0].url_template, steps[0].dashy.items[0].url_template);
   assert.deepEqual(normalizeMonitoring({ enabled: false }, "fixture"), { enabled: false });
   assert.throws(() => normalizeMonitoring({ enabled: "false" }, "fixture"));
+});
+
+test("Apps catalog classification wins over legacy Platform sections, including cached monitors", () => {
+  const platform = {
+    ...steps[0],
+    category_id: "talos-cluster",
+    dashy: { items: [{ ...steps[0].dashy.items[0], section: "Platform" }] },
+  };
+  const app = { ...platform, category_id: "apps" };
+  const previous = generate("succeeded", { steps: [platform] });
+  for (const status of ["succeeded", "pending", "failed"]) {
+    const endpoints = generate(status, { steps: [platform, app], previous });
+    assert.equal(endpoints.length, 1);
+    assert.equal(endpoints[0].group, "prd / Apps");
+  }
+});
+
+test("real user-facing apps are all included in Apps, while infrastructure remains Platform", () => {
+  const catalog = loadCatalogDefinitions({
+    workspaceRoot: path.resolve(import.meta.dirname, "../.."),
+    includeApps: true,
+    loadYamlFn: (file) => YAML.parse(fs.readFileSync(file, "utf8")),
+  });
+  const ids = [
+    "install-copyparty",
+    "install-immich",
+    "install-nextcloud",
+    "install-stirling-pdf",
+    "install-matrix",
+    "install-jitsi",
+    "install-mailu",
+    "install-outline",
+    "install-authentik-idp",
+  ];
+  const selected = ids.map((id) => {
+    const step = catalog.stepsById.get(id);
+    assert.ok(step, id);
+    return step;
+  });
+  const states = new Map(ids.map((id) => [id, { status: "succeeded" }]));
+  const endpoints = buildGatusEndpoints({ steps: selected, states, cluster });
+  for (const title of [
+    "copyparty",
+    "Immich",
+    "Nextcloud",
+    "Stirling PDF",
+    "Element",
+    "Jitsi",
+    "Mailu",
+    "Outline",
+  ]) {
+    const endpoint = endpoints.find((entry) => entry.name.startsWith(`${title} · `));
+    assert.ok(endpoint, title);
+    assert.equal(endpoint.group, "prd / Apps", title);
+  }
+  assert.equal(
+    endpoints.find((endpoint) => endpoint.name.startsWith("Authentik · ")).group,
+    "prd / Platform"
+  );
 });
 
 test("notification credentials retain blank fields and disabled providers do not alert", () => {

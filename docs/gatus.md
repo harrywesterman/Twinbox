@@ -36,6 +36,8 @@ depending on Portal installation. Successful installs add monitors, successful
 uninstalls remove them, and temporary pending/running/failed reinstall states
 retain previously installed monitors. Multiple clusters sharing one bastion are
 rendered together, with notification overrides per endpoint group.
+Entries from the Apps catalog are grouped under **Apps**, including entries whose
+legacy dashboard section says Platform. Infrastructure keeps its dashboard group.
 
 An optional catalog item can specify:
 
