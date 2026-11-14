@@ -629,6 +629,8 @@ The **Twinbox Portal** is the default user-facing landing page:
 
 **Dashy** remains the legacy admin launcher at `admin.<ZONE_NAME>` for operator tools, while the portal becomes the normal front door for end users. Dashy tiles are also rendered at runtime from step metadata into `ConfigMap/dashy-config`.
 
+Catalog tiles can declare `admin_only: true` to appear in Dashy even when their install step belongs to Apps, while remaining absent from the user portal. Element Admin uses this setting; Element remains in the user portal. The Gatus status tile is available in Dashy with its own local icon.
+
 Apps installed through the App Installs flow are rendered in the portal catalog for end users and are excluded from Dashy tiles.
 
 ## Runtime Guarantees

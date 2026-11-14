@@ -5,6 +5,7 @@ import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
+import YAML from "yaml";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -171,4 +172,20 @@ test("refresh-dashy-config skips App Installs steps", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Dashy refresh skipped: install-jitsi is a user app install/);
   assert.equal(fs.existsSync(result.logFile), false);
+});
+
+test("refresh-dashy-config includes only admin tiles when an app has management tools", () => {
+  const result = runRefresh("install-matrix", {
+    stepStatuses: {
+      "install-dashy-dashboard": "succeeded",
+      "install-matrix": "succeeded",
+      "install-gatus": "succeeded",
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const config = YAML.parse(fs.readFileSync(result.capturedConfigFile, "utf8"));
+  const items = config.sections.flatMap((section) => section.items);
+  assert(items.some((item) => item.title === "Element Admin"));
+  assert(items.some((item) => item.title === "Twinbox Status"));
+  assert(!items.some((item) => item.title === "Element"));
 });

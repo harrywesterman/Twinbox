@@ -11,6 +11,16 @@ import { buildPortalConfig } from "../../lib/portal-config.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("Element stays in the user portal while Element Admin is reserved for Dashy", () => {
+  const config = buildPortalConfig({
+    steps: [loadAppStep("install-matrix")],
+    stepStateById: new Map([["install-matrix", { status: "succeeded" }]]),
+    cluster: { id: "prd", dns_domain: "example.com" },
+  });
+  assert(config.apps.some((card) => card.title === "Element"));
+  assert(!config.apps.some((card) => card.title === "Element Admin"));
+});
+
 function loadStep(stepId) {
   const file = path.join(repoRoot, "categories", "talos-cluster", "steps", stepId, "step.yaml");
   const manifest = YAML.parse(fs.readFileSync(file, "utf8"));

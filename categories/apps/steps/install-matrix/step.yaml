@@ -21,6 +21,7 @@ dashy:
       url_template: https://chat.__ZONE_NAME__
     - section: Platform
       title: Element Admin
+      admin_only: true
       description: Matrix admin console
       icon: fas fa-cog
       url_template: https://element-admin.__ZONE_NAME__

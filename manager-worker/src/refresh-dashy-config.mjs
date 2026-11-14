@@ -251,7 +251,14 @@ function main() {
       throw new Error(`unknown step: ${options.triggerStepId}`);
     }
 
-    if (appStepIds.has(options.triggerStepId)) {
+    if (
+      appStepIds.has(options.triggerStepId) &&
+      !steps.some(
+        (step) =>
+          step.id === options.triggerStepId &&
+          step.dashy?.items?.some((item) => item.admin_only === true)
+      )
+    ) {
       console.log(`Dashy refresh skipped: ${options.triggerStepId} is a user app install`);
       return;
     }

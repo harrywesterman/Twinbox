@@ -12,6 +12,36 @@ import { buildDashyConfig } from "../../lib/dashy-config.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("admin tiles from app steps and Gatus have local icons in Dashy", () => {
+  const file = path.join(repoRoot, "categories/apps/steps/install-matrix/step.yaml");
+  const manifest = YAML.parse(fs.readFileSync(file, "utf8"));
+  const matrix = normalizeStepManifest(manifest, file, "apps");
+  const gatus = loadStep("install-gatus");
+  for (const status of ["succeeded", "configured"]) {
+    const config = buildDashyConfig({
+      steps: [matrix, gatus],
+      stepStateById: new Map([
+        [matrix.id, { status }],
+        [gatus.id, { status }],
+      ]),
+      cluster: { id: "prd", dns_domain: "example.com" },
+      excludeStepIds: [matrix.id],
+      workspaceRoot: repoRoot,
+    });
+    const items = config.sections.flatMap((section) => section.items);
+    assert(!items.some((item) => item.title === "Element"));
+    assert.equal(items.find((item) => item.title === "Element Admin")?.icon, "install-matrix.svg");
+    const tile = items.find((item) => item.title === "Twinbox Status");
+    assert.equal(tile?.url, "https://status.example.com");
+    assert.equal(tile?.icon, "install-gatus.svg");
+  }
+  manifest.dashy.items[1].admin_only = "true";
+  assert.throws(
+    () => normalizeStepManifest(manifest, file, "apps"),
+    /admin_only must be a boolean/
+  );
+});
+
 function loadStep(stepId) {
   const file = path.join(repoRoot, "categories", "talos-cluster", "steps", stepId, "step.yaml");
   const manifest = YAML.parse(fs.readFileSync(file, "utf8"));
