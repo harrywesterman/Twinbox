@@ -12,6 +12,10 @@ dashy:
       description: User portal
       icon: install-twinbox-portal
       url_template: https://portal.__ZONE_NAME__
+      monitoring:
+        path: /api/health
+        status_codes: [200]
+        body_contains: '"ok":true'
 inputs: []
 secrets:
   files:

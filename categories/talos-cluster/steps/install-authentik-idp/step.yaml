@@ -12,6 +12,9 @@ dashy:
       description: Identity provider
       icon: fas fa-id-card
       url_template: https://authentik.__ZONE_NAME__
+      monitoring:
+        path: /-/health/live/
+        status_codes: [200, 204]
 inputs: []
 secrets:
   files:

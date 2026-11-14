@@ -1,4 +1,5 @@
 import express from "express";
+import { prepareGatusInputs } from "../../lib/gatus-notifications.mjs";
 import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
@@ -1321,6 +1322,9 @@ function writeStepState(stepId, patch, clusterScope = null) {
 
 function prepareStepInputs(step, normalizedInputs, clusterId) {
   const { publicInputs, secretFields } = partitionStepInputs(step, normalizedInputs);
+  if (step.id === "configure-gatus-notifications") {
+    return prepareGatusInputs(publicInputs, secretFields, clusterId);
+  }
   if (Object.keys(secretFields).length === 0) {
     return publicInputs;
   }
@@ -2209,7 +2213,26 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     context = { cluster: requestedCluster.cluster };
   }
 
-  const jobInputs = prepareStepInputs(step, validated.value, clusterId);
+  if (["install-gatus", "configure-gatus-notifications"].includes(stepId)) {
+    const scope = context.cluster?.cluster_instance_id || clusterId;
+    const bastion = readStepState("provision-netbird-bastion", scope);
+    if (bastion?.status !== "succeeded")
+      return res.status(409).json({ error: "Provision the NetBird bastion first" });
+    if (
+      stepId === "configure-gatus-notifications" &&
+      readStepState("install-gatus", scope)?.status !== "succeeded"
+    )
+      return res.status(409).json({ error: "Install Gatus first" });
+  }
+  let jobInputs;
+  try {
+    jobInputs = prepareStepInputs(step, validated.value, clusterId);
+  } catch {
+    return res.status(400).json({
+      error:
+        "Invalid notification settings: complete the enabled channel fields (HTTPS ntfy server, valid keys). Saved secrets may be left blank.",
+    });
+  }
   const payload = {
     step_id: step.id,
     step_type: step.type,
@@ -2233,7 +2256,10 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
     step.id,
     {
       status: "pending",
-      inputs: jobInputs,
+      inputs:
+        stepId === "configure-gatus-notifications"
+          ? Object.fromEntries(Object.entries(jobInputs).filter(([key]) => key !== "test_only"))
+          : jobInputs,
       outputs: null,
       error: null,
       last_job_id: job.id,

@@ -25,6 +25,8 @@ const FIXED_SETUP_STEP_IDS = [
   "install-authentik-idp",
   "create-users-and-groups",
   "provision-netbird-bastion",
+  "install-gatus",
+  "configure-gatus-notifications",
   "configure-cloudflare-tunnel",
   "configure-netbird-ingress",
   "install-netbird-routing-peers",

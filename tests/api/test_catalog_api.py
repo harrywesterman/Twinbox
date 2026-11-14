@@ -87,6 +87,66 @@ EOF
     )
 
 
+def test_gatus_requires_bastion_and_keeps_notification_secrets_out_of_api_and_jobs():
+    with tempfile.TemporaryDirectory() as td:
+        data_dir = Path(td) / "data"
+        cluster_id = "gatus-test"
+        instance_id = "gatus-instance"
+        (data_dir / "clusters").mkdir(parents=True)
+        (data_dir / "clusters" / f"{cluster_id}.json").write_text(
+            json.dumps(
+                {
+                    "id": cluster_id,
+                    "slug": cluster_id,
+                    "cluster_instance_id": instance_id,
+                    "status": "bootstrapped",
+                    "ingress_route": "netbird",
+                }
+            )
+        )
+        state_dir = _cluster_step_state(data_dir, instance_id, "provision-nodes").parent
+        state_dir.mkdir(parents=True)
+        (state_dir / "provision-nodes.json").write_text(json.dumps({"status": "succeeded"}))
+        port = _find_free_port()
+        proc = _start_api(data_dir, port)
+        try:
+            base = f"http://127.0.0.1:{port}"
+            _wait_for_health(base)
+            payload = {"cluster_id": cluster_id, "cluster_instance_id": instance_id, "inputs": {}}
+            status, _body = _post_json(f"{base}/api/steps/install-gatus/execute", payload)
+            assert status == 409
+            for step_id in ("provision-netbird-bastion", "install-gatus"):
+                (state_dir / f"{step_id}.json").write_text(json.dumps({"status": "succeeded"}))
+            payload["inputs"] = {"telegram_enabled": True}
+            status, _body = _post_json(
+                f"{base}/api/steps/configure-gatus-notifications/execute", payload
+            )
+            assert status == 400
+            payload["inputs"].update(
+                {"telegram_token": "private-token", "telegram_chat_id": "private-chat"}
+            )
+            status, body = _post_json(
+                f"{base}/api/steps/configure-gatus-notifications/execute", payload
+            )
+            assert status == 202, body
+            job = (data_dir / "jobs" / f"{body['job_id']}.json").read_text()
+            state = (state_dir / "configure-gatus-notifications.json").read_text()
+            status, catalog = _get_json(f"{base}/api/catalog?cluster_id={cluster_id}")
+            assert status == 200
+            serialized = job + state + json.dumps(catalog)
+            assert "private-token" not in serialized
+            assert "private-chat" not in serialized
+            assert "backup-storage-pending" not in job
+            payload["inputs"] = {"telegram_enabled": True, "telegram_token": ""}
+            status, body = _post_json(
+                f"{base}/api/steps/configure-gatus-notifications/execute", payload
+            )
+            assert status == 202, body
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+
 def test_backup_storage_secret_inputs_never_enter_job_or_step_state():
     with tempfile.TemporaryDirectory() as td:
         data_dir = Path(td) / "data"

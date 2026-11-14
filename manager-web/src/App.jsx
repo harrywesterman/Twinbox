@@ -40,6 +40,7 @@ import { normalizeLogEntries } from "./install-logs.js";
 import { getInputOptions } from "./input-options.js";
 import { isInputVisible, omitSensitiveAnswers } from "./input-visibility.js";
 import { getQuestionSteps } from "./question-flow.js";
+import { gatusTestInputs } from "./gatus-notifications.js";
 import {
   isMissingClusterError,
   recoverMissingClusterState,
@@ -1679,6 +1680,9 @@ function App() {
     const body = {
       inputs: buildPayloadInputs(step, draft),
     };
+    if (step.id === "configure-gatus-notifications" && options.testNotification) {
+      body.inputs = gatusTestInputs(draft);
+    }
 
     if (step.id === "provision-nodes") {
       const ipAvailability = await fetchProvisionIpAvailability();
@@ -3093,6 +3097,11 @@ function App() {
                 ) : (
                   <div className="wizard-input-grid">
                     {(currentStep?.inputs || [])
+                      .filter(
+                        (input) =>
+                          currentStep?.id !== "configure-gatus-notifications" ||
+                          input.id !== "test_only"
+                      )
                       .filter((input) => isInputVisible(input, currentDraft))
                       .filter(
                         (input) =>
@@ -3117,6 +3126,55 @@ function App() {
                           }
                         />
                       ))}
+                    {currentStep?.id === "configure-gatus-notifications" && (
+                      <div>
+                        <p>
+                          Opgeslagen velden:{" "}
+                          {(currentStep.state?.outputs?.credentials_set || []).join(", ") ||
+                            "nog geen"}
+                          . Laat geheime velden leeg om de opgeslagen waarde te behouden.
+                        </p>
+                        <button
+                          className="button"
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            executeStep(currentStep, clusterId, { testNotification: true })
+                          }
+                        >
+                          Testmelding sturen
+                        </button>
+                        {currentStep.state?.outputs?.test && (
+                          <p>{currentStep.state.outputs.test.provider}: testmelding verzonden.</p>
+                        )}
+                      </div>
+                    )}
+                    {currentStep?.id === "install-gatus" &&
+                      currentStep.state?.outputs?.status_url && (
+                        <div>
+                          <a
+                            href={currentStep.state.outputs.status_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open statuspagina
+                          </a>
+                          <p>
+                            Laatste synchronisatie:{" "}
+                            {currentStep.state.outputs.last_success_at || "onbekend"}
+                          </p>
+                          {[
+                            ...(currentStep.state.outputs.warnings || []),
+                            currentStep.state.outputs.sync_warning,
+                          ]
+                            .filter(Boolean)
+                            .map((warning) => (
+                              <p key={warning} role="status">
+                                {warning}
+                              </p>
+                            ))}
+                        </div>
+                      )}
                     {currentStep?.id === "configure-backup-storage" &&
                       currentDraft.backup_storage_mode === "managed-seaweedfs" && (
                         <BackupStorageFields

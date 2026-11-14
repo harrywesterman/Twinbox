@@ -341,6 +341,7 @@ if [[ -f /opt/netbird/docker-compose.yml ]]; then
 
   python3 <<'PY'
 import os
+import re
 import yaml
 from pathlib import Path
 
@@ -571,6 +572,13 @@ proxy = services.get("proxy")
 if proxy:
     passthrough_label = "traefik.tcp.routers.proxy-passthrough.rule"
     passthrough_rule = f"HostSNI(`*`) && !HostSNI(`{netbird_domain}`)"
+    gatus_hosts_file = Path("/opt/twinbox/gatus/hosts.json")
+    if gatus_hosts_file.exists():
+        import json
+        for status_host in json.loads(gatus_hosts_file.read_text()):
+            if not re.fullmatch(r"[a-zA-Z0-9.-]+", status_host):
+                raise ValueError("Invalid Gatus status hostname")
+            passthrough_rule += f" && !HostSNI(`{status_host}`)"
     remove_label_keys(proxy, is_removed_http_wildcard_label)
     set_labels(proxy, {passthrough_label: passthrough_rule})
     volumes = proxy.setdefault("volumes", [])

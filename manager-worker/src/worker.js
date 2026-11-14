@@ -1122,6 +1122,22 @@ async function refreshPortalConfig(
   }
 }
 
+async function refreshGatus(jobId = null) {
+  const result = await new Promise((resolve) => {
+    const child = spawn("node", [path.join(workspace, "manager-worker/src/gatus-sync.mjs")], {
+      env: { ...process.env, WORKSPACE_ROOT: workspace, MANAGER_DATA_DIR: dataRoot },
+      stdio: "ignore",
+    });
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
+  });
+  if (!result) {
+    const message = "Gatus refresh warning: synchronisation failed; retry within five minutes";
+    if (jobId) appendLog(jobId, message);
+    else console.warn(message);
+  }
+}
+
 async function refreshGrafanaDashboard(
   jobId,
   stepId,
@@ -1230,12 +1246,16 @@ async function handleRunStep(job) {
   const clusterInstanceId = clusterScopeId(context?.cluster, job.cluster_instance_id || null);
   const resultFile = path.join(dirs.stepResults, `${job.id}.json`);
   fs.rmSync(resultFile, { force: true });
+  const stateInputs =
+    stepId === "configure-gatus-notifications"
+      ? Object.fromEntries(Object.entries(inputs).filter(([key]) => key !== "test_only"))
+      : inputs;
 
   updateStepState(
     stepId,
     {
       status: "running",
-      inputs,
+      inputs: stateInputs,
       outputs: null,
       error: null,
       last_job_id: job.id,
@@ -1288,6 +1308,7 @@ async function handleRunStep(job) {
     const postRefreshRuntime = resolvePostRefreshSecretRuntime(payload, clusterId, secretRuntime);
     const postRefreshRedact = buildRedactor(postRefreshRuntime.redactions);
     try {
+      await refreshGatus(job.id);
       await refreshDashyConfig(
         job.id,
         stepId,
@@ -1429,6 +1450,7 @@ async function handleUninstallStep(job) {
       clusterInstanceId || clusterId
     );
 
+    await refreshGatus(job.id);
     await refreshPortalConfig(
       job.id,
       stepId,
@@ -1604,10 +1626,15 @@ function pickNextJob() {
   return nextJobs[0]?.fullPath || null;
 }
 
+let lastGatusReconcile = 0;
 async function loop() {
   const next = pickNextJob();
   if (next) {
     await handleJob(next);
+  }
+  if (Date.now() - lastGatusReconcile >= 300000) {
+    lastGatusReconcile = Date.now();
+    await refreshGatus();
   }
   setTimeout(loop, pollMs);
 }

@@ -1,0 +1,19 @@
+id: install-gatus
+title: Install Gatus Status
+type: action
+journey_stage: setup
+ingress_route: netbird
+summary: Public availability monitoring on the bastion, independent of Kubernetes.
+explanation: Deploy Gatus with Docker Compose on the existing Twinbox bastion and automatically monitor installed apps.
+side_help: The public status page remains online during cluster outages. Complete bastion outages are not detected by this monitor. App checks behind login verify reachability only.
+dashy:
+  items:
+    - section: Platform
+      title: Twinbox Status
+      description: Public service availability
+      icon: fas fa-heartbeat
+      url_template: https://status.__ZONE_NAME__
+inputs: []
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/install-gatus/run.sh

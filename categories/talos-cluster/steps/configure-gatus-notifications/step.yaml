@@ -1,0 +1,85 @@
+id: configure-gatus-notifications
+title: Configure Gatus notifications
+type: config
+journey_stage: setup
+ingress_route: netbird
+summary: Send outage and recovery notifications directly from the bastion.
+explanation: Enable Telegram, ntfy or Pushover. Leave secret fields empty to keep previously saved credentials.
+side_help: Configure notifications after installing Gatus. Use an external ntfy server to receive alerts during cluster outages. Test notifications are sent from the bastion. Complete bastion failure requires an external monitor, which is not included.
+inputs:
+  - id: telegram_enabled
+    label: Enable Telegram
+    type: boolean
+    default: false
+    required: false
+  - id: telegram_token
+    label: Telegram bot token
+    type: password
+    sensitive: true
+    secret_field: telegram_token
+    required: false
+    help: Leave empty to retain the saved token.
+  - id: telegram_chat_id
+    label: Telegram chat ID
+    type: password
+    sensitive: true
+    secret_field: telegram_chat_id
+    required: false
+  - id: ntfy_enabled
+    label: Enable ntfy
+    type: boolean
+    default: false
+    required: false
+  - id: ntfy_url
+    label: ntfy HTTPS server URL
+    type: password
+    sensitive: true
+    secret_field: ntfy_url
+    required: false
+    help: Using ntfy in this cluster prevents alerts during a cluster outage. Leave empty to retain the saved server.
+  - id: ntfy_topic
+    label: ntfy topic
+    type: password
+    sensitive: true
+    secret_field: ntfy_topic
+    required: false
+  - id: ntfy_token
+    label: ntfy token (optional)
+    type: password
+    sensitive: true
+    secret_field: ntfy_token
+    required: false
+  - id: pushover_enabled
+    label: Enable Pushover
+    type: boolean
+    default: false
+    required: false
+  - id: pushover_token
+    label: Pushover application token
+    type: password
+    sensitive: true
+    secret_field: pushover_token
+    required: false
+  - id: pushover_user_key
+    label: Pushover user key
+    type: password
+    sensitive: true
+    secret_field: pushover_user_key
+    required: false
+  - id: test_provider
+    label: Test notification channel (save settings first)
+    type: string
+    required: false
+    default: telegram
+    options:
+      - telegram
+      - ntfy
+      - pushover
+  - id: test_only
+    label: Test saved notification settings
+    type: boolean
+    default: false
+    required: false
+runner:
+  kind: script
+  script: categories/talos-cluster/steps/configure-gatus-notifications/run.sh
