@@ -179,3 +179,8 @@ def test_bootstrap_preserves_status_exclusions():
     template = (ROOT / "scripts/manager/netbird-bastion-bootstrap-template.sh").read_text()
     assert "/opt/twinbox/gatus/hosts.json" in template
     assert 'passthrough_rule += f" && !HostSNI(`{status_host}`)"' in template
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    assert (
+        "GATUS_MANAGEMENT_HEALTH_URL=${GATUS_MANAGEMENT_HEALTH_URL:-}"
+        in compose["services"]["manager-worker"]["environment"]
+    )

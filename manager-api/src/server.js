@@ -2227,7 +2227,8 @@ app.post("/api/steps/:stepId/execute", async (req, res) => {
   let jobInputs;
   try {
     jobInputs = prepareStepInputs(step, validated.value, clusterId);
-  } catch {
+  } catch (error) {
+    if (stepId !== "configure-gatus-notifications") throw error;
     return res.status(400).json({
       error:
         "Invalid notification settings: complete the enabled channel fields (HTTPS ntfy server, valid keys). Saved secrets may be left blank.",

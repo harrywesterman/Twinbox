@@ -299,6 +299,8 @@ export function reconcileGatus({
         results.push(safe);
       }
     } catch (error) {
+      // A failed channel test says nothing about monitor synchronisation.
+      if (testing) throw error;
       for (const member of members) {
         const file = path.join(cacheDir, `${member.scope}.json`);
         writeJsonFile(file, {

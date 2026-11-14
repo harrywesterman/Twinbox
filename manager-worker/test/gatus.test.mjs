@@ -198,6 +198,18 @@ test("shared bastions reconcile all clusters, preserve monitors on failed deploy
     assert.ok(cache.endpoints.length);
     assert.ok(cache.last_success_at);
     assert.equal(cache.error, "Bastion synchronisation failed");
+    const beforeTest = fs.readFileSync(path.join(directory, "gatus/prd.json"), "utf8");
+    assert.throws(() =>
+      reconcileGatus({
+        ...options,
+        mode: "configure",
+        inputs: { test_only: true, test_provider: "telegram" },
+        remote: () => {
+          throw new Error("notification rejected");
+        },
+      })
+    );
+    assert.equal(fs.readFileSync(path.join(directory, "gatus/prd.json"), "utf8"), beforeTest);
     assert.ok(
       JSON.parse(
         fs.readFileSync(path.join(directory, "step-state/clusters/prd/install-gatus.json"))
