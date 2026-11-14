@@ -30,6 +30,8 @@ test("Gatus uses public zone, private results, thresholds and stable identities"
   const [endpoint] = generate("succeeded", { providers: ["telegram"] });
   assert.equal(endpoint.url, "https://app.example.test/");
   assert.equal(endpoint.client["ignore-redirect"], true);
+  assert.equal(endpoint.conditions[0], "[STATUS] == any(200, 301, 302, 303, 307, 308)");
+  assert.equal(endpoint.group, "prd / Apps");
   assert.equal(endpoint.ui["hide-errors"], true);
   assert.equal(endpoint.ui["hide-hostname"], true);
   assert.equal(endpoint.ui["hide-url"], true);

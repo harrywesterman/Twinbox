@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gatusTestInputs } from "../src/gatus-notifications.js";
+import { gatusTestInputs, visibleGatusInputs } from "../src/gatus-notifications.js";
 import { getWizardSteps } from "../src/journey.js";
 
 test("notification test uses saved channel settings without sending drafts or secrets", () => {
@@ -9,6 +9,15 @@ test("notification test uses saved channel settings without sending drafts or se
     { test_only: true, test_provider: "ntfy" }
   );
   assert.equal(gatusTestInputs({ test_provider: "untrusted" }).test_provider, "telegram");
+});
+
+test("both wizard phases hide the internal test switch and keep channel selection", () => {
+  const inputs = [{ id: "test_only" }, { id: "test_provider" }, { id: "telegram_token" }];
+  assert.deepEqual(
+    visibleGatusInputs({ id: "configure-gatus-notifications", inputs }).map((input) => input.id),
+    ["test_provider", "telegram_token"]
+  );
+  assert.equal(visibleGatusInputs({ id: "other", inputs }).length, 3);
 });
 
 test("Gatus steps follow bastion provisioning and are excluded for other ingress routes", () => {

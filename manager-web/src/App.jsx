@@ -40,7 +40,8 @@ import { normalizeLogEntries } from "./install-logs.js";
 import { getInputOptions } from "./input-options.js";
 import { isInputVisible, omitSensitiveAnswers } from "./input-visibility.js";
 import { getQuestionSteps } from "./question-flow.js";
-import { gatusTestInputs } from "./gatus-notifications.js";
+import { gatusTestInputs, visibleGatusInputs } from "./gatus-notifications.js";
+import GatusControls from "./GatusControls.jsx";
 import {
   isMissingClusterError,
   recoverMissingClusterState,
@@ -2760,7 +2761,7 @@ function App() {
                     </div>
                   </div>
                   <div className="wizard-input-grid">
-                    {currentStep.inputs
+                    {visibleGatusInputs(currentStep)
                       .filter((input) => isInputVisible(input, currentDraft))
                       .map((input) => (
                         <InputField
@@ -2776,6 +2777,11 @@ function App() {
                   </div>
                 </section>
               ) : null}
+              <GatusControls
+                step={currentStep}
+                busy={busy}
+                onTest={() => executeStep(currentStep, clusterId, { testNotification: true })}
+              />
               <section
                 ref={liveOutputRef}
                 className={`wizard-card wizard-output-panel wizard-output-panel-minimal wizard-install-output ${model.activity.runtime.isLive ? "is-live" : ""}`}
@@ -3096,12 +3102,7 @@ function App() {
                   </>
                 ) : (
                   <div className="wizard-input-grid">
-                    {(currentStep?.inputs || [])
-                      .filter(
-                        (input) =>
-                          currentStep?.id !== "configure-gatus-notifications" ||
-                          input.id !== "test_only"
-                      )
+                    {visibleGatusInputs(currentStep)
                       .filter((input) => isInputVisible(input, currentDraft))
                       .filter(
                         (input) =>
@@ -3126,55 +3127,11 @@ function App() {
                           }
                         />
                       ))}
-                    {currentStep?.id === "configure-gatus-notifications" && (
-                      <div>
-                        <p>
-                          Opgeslagen velden:{" "}
-                          {(currentStep.state?.outputs?.credentials_set || []).join(", ") ||
-                            "nog geen"}
-                          . Laat geheime velden leeg om de opgeslagen waarde te behouden.
-                        </p>
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            executeStep(currentStep, clusterId, { testNotification: true })
-                          }
-                        >
-                          Testmelding sturen
-                        </button>
-                        {currentStep.state?.outputs?.test && (
-                          <p>{currentStep.state.outputs.test.provider}: testmelding verzonden.</p>
-                        )}
-                      </div>
-                    )}
-                    {currentStep?.id === "install-gatus" &&
-                      currentStep.state?.outputs?.status_url && (
-                        <div>
-                          <a
-                            href={currentStep.state.outputs.status_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open statuspagina
-                          </a>
-                          <p>
-                            Laatste synchronisatie:{" "}
-                            {currentStep.state.outputs.last_success_at || "onbekend"}
-                          </p>
-                          {[
-                            ...(currentStep.state.outputs.warnings || []),
-                            currentStep.state.outputs.sync_warning,
-                          ]
-                            .filter(Boolean)
-                            .map((warning) => (
-                              <p key={warning} role="status">
-                                {warning}
-                              </p>
-                            ))}
-                        </div>
-                      )}
+                    <GatusControls
+                      step={currentStep}
+                      busy={busy}
+                      onTest={() => executeStep(currentStep, clusterId, { testNotification: true })}
+                    />
                     {currentStep?.id === "configure-backup-storage" &&
                       currentDraft.backup_storage_mode === "managed-seaweedfs" && (
                         <BackupStorageFields

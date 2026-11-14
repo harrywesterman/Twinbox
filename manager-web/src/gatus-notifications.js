@@ -6,3 +6,9 @@ export function gatusTestInputs(draft = {}) {
       : "telegram",
   };
 }
+
+export function visibleGatusInputs(step) {
+  return (step?.inputs || []).filter(
+    (input) => step.id !== "configure-gatus-notifications" || input.id !== "test_only"
+  );
+}
