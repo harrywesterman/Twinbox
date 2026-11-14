@@ -240,20 +240,6 @@ def wait_public(host):
     raise RuntimeError("Public Gatus HTTPS check failed")
 
 
-def coverage_warnings(config):
-    warnings = []
-    for endpoint in config.get("endpoints", []):
-        if not endpoint["name"].startswith("Management VM · "):
-            continue
-        try:
-            with urllib.request.urlopen(endpoint["url"], timeout=3) as response:
-                if response.status != 200:
-                    warnings.append(endpoint["group"])
-        except Exception:
-            warnings.append(endpoint["group"])
-    return warnings
-
-
 def apply(payload):
     stack = yaml.safe_load(NETBIRD.read_text())
     marker = json.loads(MARKER.read_text())
@@ -310,7 +296,7 @@ def apply(payload):
     digest_file = ROOT / "digest"
     if digest_file.exists() and digest_file.read_text() == digest:
         wait_healthy()
-        return {"changed": False, "coverage_warnings": coverage_warnings(config)}
+        return {"changed": False}
     command("docker", "pull", payload["image"], timeout=300)
     validate_candidate(payload["image"], config)
     backup = ROOT / "backups" / time.strftime("%Y%m%d-%H%M%S")
@@ -397,7 +383,7 @@ def apply(payload):
         if (ROOT / "compose.yaml").exists():
             compose("up", "-d", "--force-recreate", "gatus")
         raise RuntimeError("Gatus activation failed; previous configuration restored") from None
-    return {"changed": True, "coverage_warnings": coverage_warnings(config)}
+    return {"changed": True}
 
 
 def main():

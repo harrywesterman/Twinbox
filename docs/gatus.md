@@ -55,12 +55,10 @@ The defaults are a 60-second interval, 10-second timeout, three consecutive
 failures before alerting, two consecutive successes before a recovery message,
 and a minimum reminder interval of 60 minutes. SQLite persists history in `data/`.
 
-The Management VM check discovers its NetBird address from the existing host
-client, falling back to configured management addresses. For an explicit reachable
-health URL set `GATUS_MANAGEMENT_HEALTH_URL` in the Management VM environment, or
-`MANAGEMENT_HEALTH_URL` in its existing bastion secret. No IP ranges, routes or
-public management ports are created. Missing discovery is reported as incomplete
-coverage; a discovered but inaccessible endpoint is shown as down.
+NetBird is monitored in the cluster's **Platform** group. The private Management
+VM health endpoint is deliberately excluded: its source allowlist rejects the
+bastion, so it cannot provide a reliable health signal from this location. No
+management discovery, monitoring override, or access change is performed.
 
 The worker reconciles after completed installation/configuration/removal jobs and
 every five minutes while idle. A reconciliation failure produces a wizard warning

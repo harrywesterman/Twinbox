@@ -12,7 +12,6 @@ import {
 } from "../../lib/gatus-config.mjs";
 import { normalizeMonitoring } from "../../lib/step-manifest.mjs";
 import { reconcileGatus } from "../src/gatus-sync.mjs";
-import { discoverManagementHealthUrl } from "../src/gatus-sync.mjs";
 
 const cluster = { id: "prd", dns_domain: "example.test", cluster_instance_id: "instance-a" };
 const steps = [
@@ -71,28 +70,6 @@ test("URLs deduplicate, unresolved templates and status self-checks are excluded
     cluster: { ...cluster, dns_domain: "new.example.test" },
   });
 
-  test("management discovery uses runtime NetBird status and never invents an address", () => {
-    const address = "2001:db8::123";
-    const discovered = discoverManagementHealthUrl({}, {}, {}, () => ({
-      stdout: `NetBird IP: ${address}/64`,
-    }));
-    assert.equal(discovered, `http://[${address}]:8080/api/health`);
-    assert.equal(
-      discoverManagementHealthUrl({}, {}, {}, () => ({ stdout: "" })),
-      ""
-    );
-    assert.equal(
-      discoverManagementHealthUrl(
-        {},
-        { MANAGEMENT_HEALTH_URL: "https://management.example.test/api/health" },
-        {},
-        () => {
-          throw new Error("must not run");
-        }
-      ),
-      "https://management.example.test/api/health"
-    );
-  });
   assert.equal(changed[0].url, "https://app.new.example.test/");
 });
 
@@ -169,8 +146,22 @@ test("shared bastions reconcile all clusters, preserve monitors on failed deploy
           "secrets/global",
           `netbird-bastion-${id}.json`
         ),
-        { BASTION_SSH_HOST: "bastion.example.test", SSH_PRIVATE_KEY: "do-not-print" }
+        {
+          BASTION_SSH_HOST: "bastion.example.test",
+          SSH_PRIVATE_KEY: "do-not-print",
+          MANAGEMENT_HEALTH_URL: "https://management.example.test/api/health",
+        }
       );
+      write(path.join(directory, "gatus", `${id}.json`), {
+        installed: true,
+        endpoints: [
+          {
+            name: "Management VM · legacy",
+            group: `${id} / Basisdiensten`,
+            url: "https://management.example.test/api/health",
+          },
+        ],
+      });
     }
     const captured = [];
     const options = {
@@ -186,8 +177,24 @@ test("shared bastions reconcile all clusters, preserve monitors on failed deploy
     assert.equal(captured.length, 1);
     assert.equal(captured[0].hosts.length, 2);
     assert.ok(captured[0].config.endpoints.length >= 2);
+    assert.equal(
+      captured[0].config.endpoints.some((endpoint) => endpoint.name.startsWith("Management VM · ")),
+      false
+    );
+    const netbird = captured[0].config.endpoints.filter((endpoint) =>
+      endpoint.name.startsWith("NetBird · ")
+    );
+    assert.equal(netbird.length, 2);
+    assert.deepEqual(netbird.map((endpoint) => endpoint.group).sort(), [
+      "dev / Platform",
+      "prd / Platform",
+    ]);
+    assert.equal(
+      captured[0].config.endpoints.some((endpoint) => endpoint.group.includes("Basisdiensten")),
+      false
+    );
     assert.equal(JSON.stringify(results).includes("do-not-print"), false);
-    assert.ok(results[0].warnings.length);
+    assert.deepEqual(results[0].warnings, []);
     assert.throws(() =>
       reconcileGatus({
         ...options,

@@ -182,5 +182,5 @@ def test_bootstrap_preserves_status_exclusions():
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
     assert (
         "GATUS_MANAGEMENT_HEALTH_URL=${GATUS_MANAGEMENT_HEALTH_URL:-}"
-        in compose["services"]["manager-worker"]["environment"]
+        not in compose["services"]["manager-worker"]["environment"]
     )

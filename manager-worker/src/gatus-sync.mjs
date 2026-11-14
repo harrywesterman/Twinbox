@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { isIP } from "node:net";
 import YAML from "yaml";
 import { loadCatalogDefinitions } from "../../lib/catalog-definitions.mjs";
 import { twinboxPublicZoneName } from "../../lib/cluster-public-zone.mjs";
@@ -25,20 +24,6 @@ import {
 const read = (file, fallback = null) =>
   fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback;
 const quote = (text) => `'${text.replaceAll("'", "'\\''")}'`;
-
-export function discoverManagementHealthUrl(cluster, secret, env = process.env, run = spawnSync) {
-  const configured = secret.MANAGEMENT_HEALTH_URL || env.GATUS_MANAGEMENT_HEALTH_URL;
-  if (configured) return configured;
-  const status = run("docker", ["exec", "twinbox-netbird", "netbird", "status"], {
-    encoding: "utf8",
-    timeout: 10000,
-  });
-  const overlayIp = status.stdout?.match(/^NetBird IP:\s*([^/\s]+)/m)?.[1];
-  const address =
-    overlayIp || env.MANAGEMENT_VM_IP || cluster.management_ip || cluster.metadata?.management_ip;
-  if (!isIP(address || "")) return "";
-  return `http://${isIP(address) === 6 ? `[${address}]` : address}:8080/api/health`;
-}
 
 export function stateMap(dataRoot, steps, cluster) {
   const scope = cluster.cluster_instance_id || cluster.instance_id || cluster.id;
@@ -172,27 +157,12 @@ export function reconcileGatus({
       gatusEndpoint({
         identity: `${scope}/netbird`,
         title: "NetBird",
-        group: `${cluster.id} / Basisdiensten`,
+        group: `${cluster.id} / Platform`,
         url: netbirdUrl,
         providers: Object.keys(providers),
       })
     );
-    // Discovery/explicit runtime configuration only; do not expose a new management port.
-    const managementUrl = discoverManagementHealthUrl(cluster, secret);
-    const warnings = managementUrl
-      ? []
-      : ["Management VM health URL not discovered; management coverage is incomplete"];
-    if (managementUrl)
-      endpoints.push(
-        gatusEndpoint({
-          identity: `${scope}/management`,
-          title: "Management VM",
-          group: `${cluster.id} / Basisdiensten`,
-          url: managementUrl,
-          monitoring: { status_codes: [200] },
-          providers: Object.keys(providers),
-        })
-      );
+    const warnings = [];
     if (flags.ntfy_enabled && new URL(credentials.ntfy_url).hostname === `ntfy.${zone}`)
       warnings.push("ntfy runs in this cluster: notifications may fail during cluster outages");
     const member = {
@@ -248,13 +218,6 @@ export function reconcileGatus({
         continue;
       }
       for (const member of members) {
-        if (
-          member.endpoints.some((endpoint) => result.coverage_warnings?.includes(endpoint.group))
-        ) {
-          member.warnings.push(
-            "Management VM health endpoint is not reachable from the bastion; check existing network access"
-          );
-        }
         const status = {
           installed: true,
           endpoints: member.endpoints,
