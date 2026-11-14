@@ -46,6 +46,10 @@ monitoring:
   body_contains: healthy
 ```
 
+Set `monitoring.enabled: false` on catalog items that cannot be checked from the
+bastion. This removes the monitor while retaining the dashboard/Portal link.
+The internal SeaweedFS Backup VM administration console is excluded this way.
+
 Without explicit metadata, a check verifies public ingress reachability, accepting
 HTTP 200 or standard login redirects without following the redirect. This is not
 proof that an application behind a login works. Hostnames, URLs, errors and

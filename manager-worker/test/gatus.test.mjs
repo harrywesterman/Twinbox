@@ -88,6 +88,18 @@ test("explicit health conditions replace login reachability checks", () => {
   assert.throws(() => normalizeMonitoring({ body_contains: "x) || true" }, "fixture"));
 });
 
+test("monitoring opt-out removes cached internal monitors without removing their catalog links", () => {
+  const previous = generate("succeeded");
+  const item = { ...steps[0].dashy.items[0], monitoring: { enabled: false } };
+  const internal = [{ id: "app", dashy: { items: [item] } }];
+  for (const status of ["succeeded", "configured", "pending", "failed"]) {
+    assert.deepEqual(generate(status, { steps: internal, previous }), []);
+  }
+  assert.equal(internal[0].dashy.items[0].url_template, steps[0].dashy.items[0].url_template);
+  assert.deepEqual(normalizeMonitoring({ enabled: false }, "fixture"), { enabled: false });
+  assert.throws(() => normalizeMonitoring({ enabled: "false" }, "fixture"));
+});
+
 test("notification credentials retain blank fields and disabled providers do not alert", () => {
   assert.deepEqual(
     mergeGatusCredentials(
@@ -140,6 +152,10 @@ test("shared bastions reconcile all clusters, preserve monitors on failed deploy
       write(path.join(directory, "step-state/clusters", id, "install-authentik-idp.json"), {
         status: "succeeded",
       });
+      write(path.join(directory, "step-state/clusters", id, "configure-backup-storage.json"), {
+        status: "configured",
+        outputs: { seaweedfs_backup_admin_url: "https://backup.internal.example.test/" },
+      });
       write(
         path.join(
           process.env.TWINBOX_BOOTSTRAP_DIR,
@@ -179,6 +195,12 @@ test("shared bastions reconcile all clusters, preserve monitors on failed deploy
     assert.ok(captured[0].config.endpoints.length >= 2);
     assert.equal(
       captured[0].config.endpoints.some((endpoint) => endpoint.name.startsWith("Management VM · ")),
+      false
+    );
+    assert.equal(
+      captured[0].config.endpoints.some((endpoint) =>
+        endpoint.name.startsWith("SeaweedFS Backup VM · ")
+      ),
       false
     );
     const netbird = captured[0].config.endpoints.filter((endpoint) =>

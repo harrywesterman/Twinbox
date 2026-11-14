@@ -12,6 +12,8 @@ dashy:
       description: Dedicated S3 backup storage administration
       icon: fas fa-box-archive
       output_url_key: seaweedfs_backup_admin_url
+      monitoring:
+        enabled: false
 depends_on:
   - provision-nodes
 inputs:
