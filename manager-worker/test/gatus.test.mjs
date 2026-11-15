@@ -13,7 +13,41 @@ import {
   validateGatusNotifications,
 } from "../../lib/gatus-config.mjs";
 import { normalizeMonitoring } from "../../lib/step-manifest.mjs";
-import { reconcileGatus } from "../src/gatus-sync.mjs";
+import { ensureGatusFallback, reconcileGatus } from "../src/gatus-sync.mjs";
+
+test("status fallback targets the bastion container and removes private input", () => {
+  let secretFile;
+  ensureGatusFallback(
+    { NETBIRD_IP: "bastion.example.test" },
+    ["status.example.test"],
+    "/workspace",
+    (command, args, options) => {
+      assert.equal(command, "bash");
+      assert.equal(args[args.indexOf("--service-domain") + 1], "status.example.test");
+      assert.equal(args[args.indexOf("--target-host") + 1], "gatus");
+      assert.equal(args[args.indexOf("--target-port") + 1], "8080");
+      assert.equal(args[args.indexOf("--target-type") + 1], "cluster");
+      assert.equal(args[args.indexOf("--target-direct-upstream") + 1], "true");
+      secretFile = options.env.TWINBOX_NETBIRD_BASTION_SECRET;
+      assert.equal(fs.statSync(secretFile).mode & 0o777, 0o600);
+      return { status: 0 };
+    }
+  );
+  assert.equal(fs.existsSync(secretFile), false);
+});
+
+test("failed fallback cleans up credentials without exposing subprocess output", () => {
+  let secretFile;
+  assert.throws(
+    () =>
+      ensureGatusFallback({}, ["status.example.test"], "/workspace", (_command, _args, options) => {
+        secretFile = options.env.TWINBOX_NETBIRD_BASTION_SECRET;
+        return { status: 1, stderr: "private-token" };
+      }),
+    /^Error: Gatus NetBird fallback synchronisation failed$/
+  );
+  assert.equal(fs.existsSync(secretFile), false);
+});
 
 const cluster = { id: "prd", dns_domain: "example.test", cluster_instance_id: "instance-a" };
 const steps = [

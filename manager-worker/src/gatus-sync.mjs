@@ -25,6 +25,54 @@ const read = (file, fallback = null) =>
   fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback;
 const quote = (text) => `'${text.replaceAll("'", "'\\''")}'`;
 
+export function ensureGatusFallback(secret, hosts, workspace, run = spawnSync) {
+  // Browsers can coalesce wildcard TLS connections through NetBird instead
+  // of opening a new connection to the bastion's direct status router.
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gatus-fallback-"));
+  try {
+    const file = path.join(directory, "bastion.json");
+    fs.writeFileSync(file, JSON.stringify(secret), { mode: 0o600 });
+    for (const host of hosts) {
+      const result = run(
+        "bash",
+        [
+          path.join(workspace, "scripts/manager/ensure-netbird-service.sh"),
+          "--service-name",
+          "gatus-status",
+          "--service-domain",
+          host,
+          "--service-path",
+          "/",
+          "--target-type",
+          "cluster",
+          "--target-id",
+          "gatus",
+          "--target-host",
+          "gatus",
+          "--target-port",
+          "8080",
+          "--target-protocol",
+          "http",
+          "--target-direct-upstream",
+          "true",
+          "--target-skip-tls-verify",
+          "false",
+        ],
+        {
+          env: { ...process.env, TWINBOX_NETBIRD_BASTION_SECRET: file },
+          encoding: "utf8",
+          timeout: 120000,
+          maxBuffer: 1024 * 1024,
+        }
+      );
+      if (result.status !== 0 || result.error)
+        throw new Error("Gatus NetBird fallback synchronisation failed");
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 export function stateMap(dataRoot, steps, cluster) {
   const scope = cluster.cluster_instance_id || cluster.instance_id || cluster.id;
   return new Map(
@@ -85,7 +133,9 @@ export function invokeBastion(secret, payload, workspace) {
       throw new Error(
         "Gatus bastion synchronisation failed (check SSH, Docker, DNS and configuration)"
       );
-    return JSON.parse(result.stdout);
+    const response = JSON.parse(result.stdout);
+    if (!payload.test_provider) ensureGatusFallback(secret, payload.hosts, workspace);
+    return response;
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
