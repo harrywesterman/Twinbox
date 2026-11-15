@@ -92,9 +92,13 @@ def test_status_api_accepts_readable_history(tmp_path, monkeypatch):
     class Response(StringIO):
         status = 200
 
-    monkeypatch.setattr(
-        gatus.urllib.request, "urlopen", lambda *_args, **_kwargs: Response('[{"name":"example"}]')
-    )
+    def open_status(request, **_kwargs):
+        assert (
+            request.full_url == "http://example.test/api/v1/endpoints/statuses?page=1&pageSize=50"
+        )
+        return Response('[{"name":"example"}]')
+
+    monkeypatch.setattr(gatus.urllib.request, "urlopen", open_status)
     gatus.check_status_api("http://example.test")
 
 

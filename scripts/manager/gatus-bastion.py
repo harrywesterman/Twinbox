@@ -218,7 +218,8 @@ def check_status_api(base_url):
     """A healthy HTTP listener must also be able to read its SQLite history."""
     config = yaml.safe_load((ROOT / "config/config.yaml").read_text()) or {}
     request = urllib.request.Request(
-        f"{base_url}/api/v1/endpoints/statuses", headers={"Cache-Control": "no-cache"}
+        f"{base_url}/api/v1/endpoints/statuses?page=1&pageSize=50",
+        headers={"Cache-Control": "no-cache"},
     )
     with urllib.request.urlopen(request, timeout=5) as response:
         statuses = json.load(response)
