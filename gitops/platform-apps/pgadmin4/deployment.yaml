@@ -88,7 +88,7 @@ spec:
           # (prepare_passexec_data / passexec_api_fields) so the shared-server
           # passexec patches below no longer match and the container exits with
           # "Could not patch pgAdmin shared server passexec handling".
-          image: dpage/pgadmin4:9.18
+          image: dpage/pgadmin4:9.19
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
