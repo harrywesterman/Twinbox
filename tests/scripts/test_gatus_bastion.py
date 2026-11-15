@@ -42,6 +42,18 @@ def test_compose_is_private_persistent_and_uses_exact_host_tls():
     assert service["mem_limit"] == "256m"
     assert service["restart"] == "unless-stopped"
     assert service["cap_drop"] == ["ALL"]
+    assert service["read_only"] is True
+    assert service["tmpfs"] == ["/tmp:rw,noexec,nosuid,size=64m,mode=1777"]
+    assert (
+        service["labels"]["traefik.http.routers.twinbox-gatus-0.middlewares"]
+        == "twinbox-gatus-cache"
+    )
+    assert (
+        service["labels"][
+            "traefik.http.middlewares.twinbox-gatus-cache.headers.customresponseheaders.Cache-Control"
+        ]
+        == "no-store"
+    )
     assert (
         service["labels"]["traefik.http.routers.twinbox-gatus-0.rule"]
         == "Host(`status.example.test`)"
@@ -52,6 +64,38 @@ def test_compose_is_private_persistent_and_uses_exact_host_tls():
     )
     assert "docker.sock" not in json.dumps(config)
     assert config["networks"]["bastion"]["name"] == "discovered-network"
+
+
+@pytest.mark.parametrize("statuses", [[], {"error": "disk I/O error"}])
+def test_status_api_rejects_empty_or_failed_history(tmp_path, monkeypatch, statuses):
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config/config.yaml").write_text("endpoints:\n- name: example\n")
+    monkeypatch.setattr(gatus, "ROOT", tmp_path)
+    from io import StringIO
+
+    class Response(StringIO):
+        status = 200
+
+    monkeypatch.setattr(
+        gatus.urllib.request, "urlopen", lambda *_args, **_kwargs: Response(json.dumps(statuses))
+    )
+    with pytest.raises(RuntimeError, match="status API"):
+        gatus.check_status_api("http://example.test")
+
+
+def test_status_api_accepts_readable_history(tmp_path, monkeypatch):
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config/config.yaml").write_text("endpoints:\n- name: example\n")
+    monkeypatch.setattr(gatus, "ROOT", tmp_path)
+    from io import StringIO
+
+    class Response(StringIO):
+        status = 200
+
+    monkeypatch.setattr(
+        gatus.urllib.request, "urlopen", lambda *_args, **_kwargs: Response('[{"name":"example"}]')
+    )
+    gatus.check_status_api("http://example.test")
 
 
 def test_failed_provider_does_not_expose_token_or_address(monkeypatch):
@@ -87,6 +131,8 @@ def test_validator_has_no_network_and_always_removes_candidate(monkeypatch):
         gatus.validate_candidate("official:pinned", {"endpoints": []})
     run = calls[0]
     assert run[run.index("--network") + 1] == "none"
+    assert "--read-only" in run
+    assert run[run.index("--tmpfs") + 1] == "/tmp:rw,noexec,nosuid,size=64m,mode=1777"
     assert run[-1] == "official:pinned"
     assert cleanup[-1][1:3] == ["rm", "-f"]
 
@@ -173,6 +219,22 @@ def test_health_failure_restores_previous_config_and_preserves_data(deployment, 
     assert (root / "config/config.yaml").read_text() == "previous"
     assert (root / "compose.yaml").read_text() == "previous-compose"
     assert (root / "data/history").read_text() == "keep"
+
+
+def test_reapply_repairs_compose_drift_even_with_matching_digest(deployment, monkeypatch):
+    root, _netbird = deployment
+    monkeypatch.setattr(gatus, "validate_candidate", lambda *_args: None)
+    monkeypatch.setattr(gatus, "wait_healthy", lambda: None)
+    monkeypatch.setattr(gatus, "wait_public", lambda *_args: None)
+    payload = {"hosts": ["status.example.test"], "image": "official:pinned", "config": {}}
+    assert gatus.apply(payload) == {"changed": True}
+    assert gatus.apply(payload) == {"changed": False}
+    compose_file = root / "compose.yaml"
+    broken = yaml.safe_load(compose_file.read_text())
+    del broken["services"]["gatus"]["tmpfs"]
+    compose_file.write_text(yaml.safe_dump(broken))
+    assert gatus.apply(payload) == {"changed": True}
+    assert yaml.safe_load(compose_file.read_text())["services"]["gatus"]["tmpfs"]
 
 
 def test_bootstrap_preserves_status_exclusions():

@@ -81,6 +81,7 @@ def compose_config(image, network, hosts, entrypoint, resolver):
         "traefik.enable": "true",
         "traefik.docker.network": network,
         "traefik.http.services.twinbox-gatus.loadbalancer.server.port": "8080",
+        "traefik.http.middlewares.twinbox-gatus-cache.headers.customresponseheaders.Cache-Control": "no-store",
     }
     for index, host in enumerate(hosts):
         prefix = f"traefik.http.routers.twinbox-gatus-{index}"
@@ -92,6 +93,7 @@ def compose_config(image, network, hosts, entrypoint, resolver):
                 f"{prefix}.tls.certresolver": resolver,
                 f"{prefix}.tls.domains[0].main": host,
                 f"{prefix}.service": "twinbox-gatus",
+                f"{prefix}.middlewares": "twinbox-gatus-cache",
             }
         )
     return {
@@ -101,6 +103,7 @@ def compose_config(image, network, hosts, entrypoint, resolver):
                 "restart": "unless-stopped",
                 "mem_limit": "256m",
                 "read_only": True,
+                "tmpfs": ["/tmp:rw,noexec,nosuid,size=64m,mode=1777"],
                 "cap_drop": ["ALL"],
                 "security_opt": ["no-new-privileges:true"],
                 "volumes": ["./config:/config:ro", "./data:/data"],
@@ -169,7 +172,7 @@ def test_notification(provider, alerting):
 def validate_candidate(image, config):
     # Start the exact image in an isolated network. No live alerts can escape.
     candidate = dict(config)
-    candidate["storage"] = {"type": "memory"}
+    candidate["storage"] = {"type": "sqlite", "path": "/tmp/gatus-validation.db"}
     with tempfile.TemporaryDirectory(prefix="gatus-validate-") as directory:
         file = Path(directory) / "config.yaml"
         atomic(file, yaml.safe_dump(candidate, sort_keys=False))
@@ -185,6 +188,9 @@ def validate_candidate(image, config):
                 "none",
                 "--memory",
                 "256m",
+                "--read-only",
+                "--tmpfs",
+                "/tmp:rw,noexec,nosuid,size=64m,mode=1777",
                 "-e",
                 "GATUS_LOG_LEVEL=INFO",
                 "-v",
@@ -208,6 +214,20 @@ def validate_candidate(image, config):
             subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
 
 
+def check_status_api(base_url):
+    """A healthy HTTP listener must also be able to read its SQLite history."""
+    config = yaml.safe_load((ROOT / "config/config.yaml").read_text()) or {}
+    request = urllib.request.Request(
+        f"{base_url}/api/v1/endpoints/statuses", headers={"Cache-Control": "no-cache"}
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        statuses = json.load(response)
+        if response.status != 200 or not isinstance(statuses, list):
+            raise RuntimeError("Gatus status API failed")
+        if config.get("endpoints") and not statuses:
+            raise RuntimeError("Gatus status API returned no configured endpoints")
+
+
 def wait_healthy():
     for _ in range(30):
         try:
@@ -220,6 +240,7 @@ def wait_healthy():
             )
             with urllib.request.urlopen(f"http://{address}:8080/health", timeout=2) as response:
                 if response.status == 200:
+                    check_status_api(f"http://{address}:8080")
                     return
         except Exception:
             pass
@@ -233,6 +254,7 @@ def wait_public(host):
         try:
             with urllib.request.urlopen(f"https://{host}/health", timeout=5) as response:
                 if response.status == 200:
+                    check_status_api(f"https://{host}")
                     return
         except Exception:
             pass
@@ -288,18 +310,21 @@ def apply(payload):
             addresses = {entry[4][0] for entry in socket.getaddrinfo(host, 443)}
             if expected_address not in addresses:
                 raise RuntimeError("Status DNS does not resolve to the discovered bastion address")
+    desired_compose = compose_config(payload["image"], network, hosts, entrypoint, resolver)
     digest = hashlib.sha256(
-        json.dumps(
-            {"config": config, "image": payload["image"], "hosts": hosts}, sort_keys=True
-        ).encode()
+        json.dumps({"config": config, "compose": desired_compose}, sort_keys=True).encode()
     ).hexdigest()
     digest_file = ROOT / "digest"
-    if digest_file.exists() and digest_file.read_text() == digest:
+    compose_file = ROOT / "compose.yaml"
+    compose_matches = (
+        compose_file.exists() and yaml.safe_load(compose_file.read_text()) == desired_compose
+    )
+    if digest_file.exists() and digest_file.read_text() == digest and compose_matches:
         wait_healthy()
         return {"changed": False}
     command("docker", "pull", payload["image"], timeout=300)
     validate_candidate(payload["image"], config)
-    backup = ROOT / "backups" / time.strftime("%Y%m%d-%H%M%S")
+    backup = ROOT / "backups" / f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns()}"
     backup.mkdir(parents=True, mode=0o700)
     os.chmod(backup, 0o700)
     files = [
@@ -334,7 +359,7 @@ def apply(payload):
         atomic(
             ROOT / "compose.yaml",
             yaml.safe_dump(
-                compose_config(payload["image"], network, hosts, entrypoint, resolver),
+                desired_compose,
                 sort_keys=False,
             ),
         )
